@@ -6,6 +6,8 @@
 *.key
 secrets/
 credentials.json
+*.zip
+*.tar.gz
 
 # Python
 __pycache__/
