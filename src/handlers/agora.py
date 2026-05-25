@@ -24,8 +24,11 @@ async def cmd_agora(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_authorized(update):
         await deny_unauthorized(update)
         return
+    msg = update.effective_message
+    if not msg:
+        return
     context.user_data[_EXCLUIDOS_KEY] = []
-    await update.message.reply_text(
+    await msg.reply_text(
         textos.MSG_AGORA_TEMPO,
         reply_markup=keyboards.kb_agora_tempo(),
     )

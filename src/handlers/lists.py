@@ -61,12 +61,15 @@ async def cmd_listas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not is_authorized(update):
         await deny_unauthorized(update)
         return
+    msg = update.effective_message
+    if not msg:
+        return
     try:
-        await update.message.reply_chat_action(ChatAction.TYPING)
-        await _show_lists(update.message, update.effective_chat.id, via_message=True)
+        await msg.reply_chat_action(ChatAction.TYPING)
+        await _show_lists(msg, update.effective_chat.id, via_message=True)
     except Exception:
         logger.exception("Erro em /listas")
-        await update.message.reply_text(textos.MSG_ERRO_GENERICO)
+        await msg.reply_text(textos.MSG_ERRO_GENERICO)
 
 
 # ---------------------------------------------------------------------------
