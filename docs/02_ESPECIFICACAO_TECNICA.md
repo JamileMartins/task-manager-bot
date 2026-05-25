@@ -21,6 +21,7 @@
 > **Por que Telegram resolve "celular + computador"**: o mesmo bot é acessível pelo app de celular, desktop e web do Telegram, todos sincronizados — não há necessidade de construir clientes próprios.
 
 ### 1.1 Alternativa de simplificação máxima
+
 Se quiser evitar Postgres no início, é possível usar **SQLite** com um volume persistente na hospedagem. Porém, recomenda-se Supabase desde o MVP por causa de backup e acesso. A camada de ORM torna a troca trivial.
 
 ---
@@ -47,6 +48,7 @@ Se quiser evitar Postgres no início, é possível usar **SQLite** com um volume
                                                                        │ (Supabase)  │
                                                                        └─────────────┘
 ```
+
 
 ### 2.1 Camadas
 - **Handlers (apresentação)**: recebem updates do Telegram, montam botões inline, despacham para serviços.
