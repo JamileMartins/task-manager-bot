@@ -211,3 +211,68 @@ def msg_captura_salva(n: int) -> str:
 
 
 MSG_CLASSIFICANDO = "Classificando... 🧠"
+
+
+# ---------------------------------------------------------------------------
+# /agora (F3 — US-12)
+# ---------------------------------------------------------------------------
+
+MSG_AGORA_TEMPO = "Quanto tempo você tem agora?"
+MSG_AGORA_ENERGIA = "Qual sua energia agora?"
+MSG_AGORA_NADA = (
+    "Nada na lista encaixa agora 😌\n"
+    "Aproveita para descansar ou me manda algo novo."
+)
+MSG_AGORA_ADIAR_PENDENTE = "Adiamento chega na próxima versão — por enquanto, pula ou conclui 😊"
+
+
+def msg_agora_tarefa(task, fallback: bool = False) -> str:
+    lista_nome = task.task_list.name if task.task_list else "📥 Inbox"
+    detalhes: list[str] = [f"→ {lista_nome}"]
+    q = task.quadrant
+    if q:
+        detalhes.append(_QUADRANT_LABEL[q])
+    if task.energy and task.energy in _ENERGIA_EMOJI:
+        detalhes.append(_ENERGIA_EMOJI[task.energy])
+    if task.estimate_min:
+        detalhes.append(f"{task.estimate_min}min")
+    info = " · ".join(detalhes)
+
+    if fallback:
+        header = "Não achei nada perfeito para agora, mas que tal começar por isso?"
+    else:
+        header = "🎯 Sugestão para agora:"
+    return f"{header}\n\n{task.title}\n{info}"
+
+
+# ---------------------------------------------------------------------------
+# Detalhe e edição de tarefa (F3 — US-07, 08, 09, 10, 11)
+# ---------------------------------------------------------------------------
+
+def msg_task_detail(task) -> str:
+    import pytz
+    lista_nome = task.task_list.name if task.task_list else "📥 Inbox"
+    lines = [f"📋 {task.title}\n", f"📂 {lista_nome}"]
+
+    atributos: list[str] = []
+    if task.quadrant:
+        atributos.append(_QUADRANT_LABEL[task.quadrant])
+    if task.energy and task.energy in _ENERGIA_EMOJI:
+        atributos.append(_ENERGIA_EMOJI[task.energy] + f" {task.energy}")
+    if task.estimate_min:
+        atributos.append(f"{task.estimate_min}min")
+    lines.append(" · ".join(atributos) if atributos else "Sem atributos definidos")
+
+    if task.due_at:
+        try:
+            tz = pytz.timezone("America/Fortaleza")
+            prazo = task.due_at.astimezone(tz).strftime("%d/%m às %H:%M")
+        except Exception:
+            prazo = str(task.due_at)[:16]
+        lines.append(f"📅 {prazo}")
+    else:
+        lines.append("📅 Sem prazo")
+
+    if task.next_step:
+        lines.append(f"\n💡 Próximo passo: {task.next_step}")
+    return "\n".join(lines)

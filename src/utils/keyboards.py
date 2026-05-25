@@ -61,20 +61,14 @@ def kb_confirmar_arquivar(list_id: uuid.UUID) -> InlineKeyboardMarkup:
 # ---------------------------------------------------------------------------
 
 def kb_tasks(tasks: Sequence[Task], list_id: uuid.UUID | None = None) -> InlineKeyboardMarkup:
-    """Botão ✅ numerado para cada tarefa + botão Voltar."""
+    """Título da tarefa (→ detalhe) + ✅ por linha."""
     rows = []
-    # Botões de conclusão agrupados em linhas de 4
-    check_row: list[InlineKeyboardButton] = []
-    for i, task in enumerate(tasks, start=1):
-        check_row.append(
-            InlineKeyboardButton(f"✅ {i}", callback_data=f"complete_task:{task.id}")
-        )
-        if len(check_row) == 4:
-            rows.append(check_row)
-            check_row = []
-    if check_row:
-        rows.append(check_row)
-
+    for task in tasks:
+        title = task.title[:32] + "…" if len(task.title) > 32 else task.title
+        rows.append([
+            InlineKeyboardButton(title, callback_data=f"task_dt:{task.id}"),
+            InlineKeyboardButton("✅", callback_data=f"complete_task:{task.id}"),
+        ])
     nav_row = [InlineKeyboardButton("← Voltar", callback_data="back_to_lists")]
     if list_id is not None:
         nav_row.append(
@@ -119,17 +113,114 @@ def kb_ajustar_tarefa(
 
 
 def kb_inbox(tasks: Sequence[Task]) -> InlineKeyboardMarkup:
-    """Botão ✅ numerado para tarefas da Inbox + botão Voltar."""
+    """Título da tarefa (→ detalhe) + ✅ por linha para a Inbox."""
     rows = []
-    check_row: list[InlineKeyboardButton] = []
-    for i, task in enumerate(tasks, start=1):
-        check_row.append(
-            InlineKeyboardButton(f"✅ {i}", callback_data=f"complete_task:{task.id}")
-        )
-        if len(check_row) == 4:
-            rows.append(check_row)
-            check_row = []
-    if check_row:
-        rows.append(check_row)
+    for task in tasks:
+        title = task.title[:32] + "…" if len(task.title) > 32 else task.title
+        rows.append([
+            InlineKeyboardButton(title, callback_data=f"task_dt:{task.id}"),
+            InlineKeyboardButton("✅", callback_data=f"complete_task:{task.id}"),
+        ])
     rows.append([InlineKeyboardButton("← Voltar", callback_data="back_to_lists")])
     return InlineKeyboardMarkup(rows)
+
+
+# ---------------------------------------------------------------------------
+# Detalhe de tarefa (F3)
+# ---------------------------------------------------------------------------
+
+def kb_task_detail(task: Task, listas: list[dict]) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+
+    rows.append([InlineKeyboardButton("✅ Concluir", callback_data=f"complete_task:{task.id}")])
+
+    q_row = []
+    for q, label in [(1, "Q1 🔴"), (2, "Q2 🟡"), (3, "Q3 🔵"), (4, "Q4 ⚪")]:
+        mark = " ✓" if task.quadrant == q else ""
+        q_row.append(InlineKeyboardButton(label + mark, callback_data=f"task_q:{task.id}:{q}"))
+    rows.append(q_row)
+
+    e_row = []
+    for e, label in [("alta", "⚡ Alta"), ("media", "🔋 Média"), ("baixa", "🪫 Baixa")]:
+        mark = " ✓" if task.energy == e else ""
+        e_row.append(InlineKeyboardButton(label + mark, callback_data=f"task_e:{task.id}:{e}"))
+    rows.append(e_row)
+
+    m_row = []
+    for m, label in [(5, "5min"), (15, "15min"), (30, "30min"), (60, "1h"), (120, "2h+")]:
+        mark = " ✓" if task.estimate_min == m else ""
+        m_row.append(InlineKeyboardButton(label + mark, callback_data=f"task_m:{task.id}:{m}"))
+    rows.append(m_row)
+
+    rows.append([
+        InlineKeyboardButton("📅 Hoje", callback_data=f"task_d:{task.id}:hoje"),
+        InlineKeyboardButton("📅 Amanhã", callback_data=f"task_d:{task.id}:amanha"),
+        InlineKeyboardButton("🚫 Sem prazo", callback_data=f"task_d:{task.id}:none"),
+    ])
+    rows.append([
+        InlineKeyboardButton("📂 Mover lista", callback_data=f"task_list:{task.id}"),
+        InlineKeyboardButton("↑", callback_data=f"task_up:{task.id}"),
+        InlineKeyboardButton("↓", callback_data=f"task_dn:{task.id}"),
+    ])
+
+    if task.list_id:
+        rows.append([InlineKeyboardButton("← Voltar", callback_data=f"view_list:{task.list_id}")])
+    else:
+        rows.append([InlineKeyboardButton("← Voltar", callback_data="view_inbox")])
+
+    return InlineKeyboardMarkup(rows)
+
+
+def kb_mover_tarefa(task_id: str, listas: list[dict]) -> InlineKeyboardMarkup:
+    from src.utils.textos import lista_emoji
+    rows: list[list[InlineKeyboardButton]] = []
+    row: list[InlineKeyboardButton] = []
+    for i, lista in enumerate(listas):
+        emoji = lista_emoji(lista["slug"])
+        row.append(InlineKeyboardButton(f"{emoji} {lista['name']}", callback_data=f"mv:{i}"))
+        if len(row) == 2:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append([
+        InlineKeyboardButton("📥 Inbox", callback_data="mv:-1"),
+        InlineKeyboardButton("✖️ Cancelar", callback_data=f"task_dt:{task_id}"),
+    ])
+    return InlineKeyboardMarkup(rows)
+
+
+# ---------------------------------------------------------------------------
+# /agora (F3)
+# ---------------------------------------------------------------------------
+
+def kb_agora_tempo() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("5min", callback_data="ag_t:5"),
+            InlineKeyboardButton("15min", callback_data="ag_t:15"),
+            InlineKeyboardButton("30min", callback_data="ag_t:30"),
+        ],
+        [
+            InlineKeyboardButton("1h", callback_data="ag_t:60"),
+            InlineKeyboardButton("2h+", callback_data="ag_t:120"),
+        ],
+    ])
+
+
+def kb_agora_energia() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("⚡ Alta", callback_data="ag_e:alta"),
+        InlineKeyboardButton("🔋 Média", callback_data="ag_e:media"),
+        InlineKeyboardButton("🪫 Baixa", callback_data="ag_e:baixa"),
+    ]])
+
+
+def kb_agora_task(task_id: uuid.UUID) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Concluí!", callback_data=f"ag_ok:{task_id}")],
+        [
+            InlineKeyboardButton("⏭️ Outra", callback_data=f"ag_nx:{task_id}"),
+            InlineKeyboardButton("😴 Adiar", callback_data=f"ag_ad:{task_id}"),
+        ],
+    ])

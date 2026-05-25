@@ -34,10 +34,8 @@ async def cb_view_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             texto = textos.MSG_LISTA_VAZIA.format(nome=nome)
             kb = keyboards.kb_tasks([], list_id=list_id)
         else:
-            lines = [f"📋 {nome} ({len(tasks)} {'tarefa' if len(tasks) == 1 else 'tarefas'})\n"]
-            for i, t in enumerate(tasks, 1):
-                lines.append(f"{i}. {t.title}")
-            texto = "\n".join(lines)
+            n = len(tasks)
+            texto = f"📋 {nome} — {n} {'tarefa' if n == 1 else 'tarefas'}"
             kb = keyboards.kb_tasks(tasks, list_id=list_id)
 
         await query.edit_message_text(texto, reply_markup=kb)
