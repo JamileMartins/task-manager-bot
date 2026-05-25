@@ -5,13 +5,13 @@ import re
 import unicodedata
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from src.db.models import Config, Task, TaskList, User
+from src.db.models import Config, Reminder, Task, TaskList, User
 from src.db.session import get_session
 
 
@@ -128,6 +128,13 @@ def delete_task(task_id: str | uuid.UUID) -> bool:
 # Tarefas — conclusão
 # ---------------------------------------------------------------------------
 
+_RECURRENCE_DELTA: dict[str, timedelta] = {
+    "daily": timedelta(days=1),
+    "weekly": timedelta(weeks=1),
+    "monthly": timedelta(days=30),
+}
+
+
 def complete_task(task_id: str | uuid.UUID) -> bool:
     uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
     with get_session() as session:
@@ -138,6 +145,30 @@ def complete_task(task_id: str | uuid.UUID) -> bool:
         task.status = "concluida"
         task.completed_at = now
         task.last_touched_at = now
+
+        if task.recurrence and task.recurrence in _RECURRENCE_DELTA:
+            delta = _RECURRENCE_DELTA[task.recurrence]
+            base = task.due_at if task.due_at else now
+            next_due = base + delta
+            next_task = Task(
+                user_id=task.user_id,
+                list_id=task.list_id,
+                title=task.title,
+                notes=task.notes,
+                quadrant=task.quadrant,
+                due_at=next_due,
+                recurrence=task.recurrence,
+                estimate_min=task.estimate_min,
+                energy=task.energy,
+                status="aberta",
+                sort_order=task.sort_order,
+                created_at=now,
+                last_touched_at=now,
+            )
+            session.add(next_task)
+            session.flush()
+            _sync_reminder(session, next_task)
+
         return True
 
 
@@ -414,8 +445,8 @@ def get_lightest_task(
 # ---------------------------------------------------------------------------
 
 def update_task_attrs(task_id: str | uuid.UUID, **kwargs) -> Optional[Task]:
-    """Atualiza atributos de tarefa. Campos: quadrant, energy, estimate_min, due_at, list_id, next_step."""
-    _allowed = {"quadrant", "energy", "estimate_min", "due_at", "list_id", "next_step"}
+    """Atualiza atributos de tarefa. Campos: quadrant, energy, estimate_min, due_at, list_id, next_step, recurrence."""
+    _allowed = {"quadrant", "energy", "estimate_min", "due_at", "list_id", "next_step", "recurrence"}
     uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
     with get_session() as session:
         task = session.get(Task, uid)
@@ -425,6 +456,8 @@ def update_task_attrs(task_id: str | uuid.UUID, **kwargs) -> Optional[Task]:
             if k in _allowed:
                 setattr(task, k, v)
         task.last_touched_at = _now()
+        if "due_at" in kwargs:
+            _sync_reminder(session, task)
         return task
 
 
@@ -538,6 +571,191 @@ def create_related_task(
         session.add(task)
         session.flush()
         return task
+
+
+# ---------------------------------------------------------------------------
+# Config (US-20)
+# ---------------------------------------------------------------------------
+
+def get_config(chat_id: int) -> Optional[Config]:
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return None
+        return session.scalar(select(Config).where(Config.user_id == user.id))
+
+
+def update_config(chat_id: int, **kwargs) -> Optional[Config]:
+    _allowed = {
+        "daily_summary_time", "weekly_review_dow", "weekly_review_time",
+        "couple_group_chat_id", "stale_days", "stale_waiting_days",
+    }
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return None
+        cfg = session.scalar(select(Config).where(Config.user_id == user.id))
+        if cfg is None:
+            cfg = Config(user_id=user.id, stale_days=7, stale_waiting_days=14)
+            session.add(cfg)
+            session.flush()
+        for k, v in kwargs.items():
+            if k in _allowed:
+                setattr(cfg, k, v)
+        return cfg
+
+
+# ---------------------------------------------------------------------------
+# Rituais — resumo diário e revisão semanal (US-15, US-16)
+# ---------------------------------------------------------------------------
+
+def get_daily_summary_tasks(chat_id: int) -> tuple[list[Task], list[Task]]:
+    """Retorna (tarefas_com_prazo_hoje, ate_3_focos_Q1Q2)."""
+    import pytz
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return [], []
+
+        tz = pytz.timezone(user.timezone or "America/Fortaleza")
+        now_local = datetime.now(tz)
+        day_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = now_local.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        today_tasks = list(session.scalars(
+            select(Task)
+            .options(selectinload(Task.task_list))
+            .where(
+                Task.user_id == user.id,
+                Task.status == "aberta",
+                Task.due_at >= day_start,
+                Task.due_at <= day_end,
+            )
+            .order_by(Task.due_at)
+        ).all())
+
+        today_ids = [t.id for t in today_tasks]
+
+        q = (
+            select(Task)
+            .options(selectinload(Task.task_list))
+            .where(
+                Task.user_id == user.id,
+                Task.status == "aberta",
+                Task.quadrant.in_([1, 2]),
+            )
+            .order_by(Task.quadrant, Task.sort_order)
+            .limit(3 + len(today_ids))
+        )
+        focus_raw = session.scalars(q).all()
+        focus_tasks = [t for t in focus_raw if t.id not in today_ids][:3]
+
+        return today_tasks, focus_tasks
+
+
+def get_stale_tasks(chat_id: int) -> list[Task]:
+    """Tarefas abertas não tocadas há mais de stale_days dias."""
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return []
+        cfg = session.scalar(select(Config).where(Config.user_id == user.id))
+        stale_days = cfg.stale_days if cfg else 7
+        cutoff = _now() - timedelta(days=stale_days)
+        return list(session.scalars(
+            select(Task)
+            .options(selectinload(Task.task_list))
+            .where(
+                Task.user_id == user.id,
+                Task.status == "aberta",
+                Task.last_touched_at < cutoff,
+            )
+            .order_by(Task.last_touched_at)
+        ).all())
+
+
+def get_stale_waiting_tasks(chat_id: int) -> list[Task]:
+    """Tarefas em 'aguardando' há mais de stale_waiting_days dias."""
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return []
+        cfg = session.scalar(select(Config).where(Config.user_id == user.id))
+        stale_waiting_days = cfg.stale_waiting_days if cfg else 14
+        cutoff = _now() - timedelta(days=stale_waiting_days)
+        return list(session.scalars(
+            select(Task)
+            .options(selectinload(Task.task_list))
+            .where(
+                Task.user_id == user.id,
+                Task.status == "aguardando",
+                Task.waiting_since < cutoff,
+            )
+            .order_by(Task.waiting_since)
+        ).all())
+
+
+def archive_task(task_id: str | uuid.UUID) -> bool:
+    """Arquiva uma tarefa (status='arquivada')."""
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        task = session.get(Task, uid)
+        if task is None:
+            return False
+        task.status = "arquivada"
+        task.last_touched_at = _now()
+        return True
+
+
+def reschedule_task(task_id: str | uuid.UUID, days: int) -> Optional[Task]:
+    """Adia tarefa por N dias a partir de agora."""
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        task = session.get(Task, uid)
+        if task is None:
+            return None
+        task.due_at = _now() + timedelta(days=days)
+        task.last_touched_at = _now()
+        _sync_reminder(session, task)
+        return task
+
+
+# ---------------------------------------------------------------------------
+# Lembretes (US-17)
+# ---------------------------------------------------------------------------
+
+def _sync_reminder(session: Session, task: Task) -> None:
+    """Cria/atualiza/remove o lembrete único da tarefa com base em due_at."""
+    existing = session.scalar(
+        select(Reminder).where(Reminder.task_id == task.id, Reminder.sent.is_(False))
+    )
+    if task.due_at is None:
+        if existing:
+            session.delete(existing)
+        return
+    if existing:
+        existing.remind_at = task.due_at
+    else:
+        session.add(Reminder(task_id=task.id, remind_at=task.due_at))
+
+
+def get_due_reminders() -> list[tuple[Reminder, Task, int]]:
+    """Retorna lembretes vencidos ainda não enviados com a tarefa e o chat_id do usuário."""
+    with get_session() as session:
+        rows = session.execute(
+            select(Reminder, Task, User.telegram_chat_id)
+            .join(Task, Task.id == Reminder.task_id)
+            .join(User, User.id == Task.user_id)
+            .where(Reminder.sent.is_(False), Reminder.remind_at <= _now())
+        ).all()
+        return [(r, t, chat_id) for r, t, chat_id in rows]
+
+
+def mark_reminder_sent(reminder_id: uuid.UUID) -> None:
+    with get_session() as session:
+        r = session.get(Reminder, reminder_id)
+        if r:
+            r.sent = True
 
 
 def reorder_task(task_id: str | uuid.UUID, direction: str) -> bool:

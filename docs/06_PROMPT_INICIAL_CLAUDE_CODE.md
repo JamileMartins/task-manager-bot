@@ -6,7 +6,7 @@
 
 ## 🚀 Prompt para iniciar (Fase F1)
 
-```
+```text
 Você vai desenvolver o "Foco", um bot de tarefas para Telegram. Toda a especificação está nos arquivos do projeto. Antes de escrever qualquer código, leia nesta ordem: CLAUDE.md, docs/01_PRD.md, docs/02_ESPECIFICACAO_TECNICA.md e docs/03_HISTORIAS_DE_USUARIO.md. O CLAUDE.md contém os princípios de design que você NÃO deve violar.
 
 Stack definida: Python 3.11+, python-telegram-bot v21+ (async), SQLAlchemy 2.x + Alembic, PostgreSQL (Supabase). Siga a estrutura de pastas da seção 7 da especificação técnica.
@@ -36,24 +36,28 @@ Não implemente nada das fases F2 a F5 ainda. Quando a F1 estiver pronta e testa
 ## Prompts das fases seguintes (use uma de cada vez, após validar a anterior)
 
 ### Fase F2 — IA + classificação
-```
+
+```text
 A Fase F1 está pronta e testada. Agora implemente a Fase F2 (IA + classificação), histórias US-02, US-03 e US-04. Leia docs/04_PROMPT_CLASSIFICACAO_IA.md por completo — ele tem o system prompt de produção, regras de cada campo, exemplos few-shot, parsing seguro e pós-processamento.
 
 Entregue: o cliente de IA em services/ai_service.py (usando ANTHROPIC_API_KEY, temperatura baixa, uma chamada por brain dump); separação de múltiplas tarefas e classificação; o resumo aprovável com botões "Aprovar tudo" e "Ajustar"; o fluxo de Inbox para baixa confiança; e o fallback obrigatório: se a IA falhar ou o JSON vier inválido, salvar o texto como uma tarefa na Inbox sem quebrar (RNF08). Inclua testes para o parser de JSON, inclusive entradas malformadas. Não avance para F3.
 ```
 
 ### Fase F3 — Priorização
-```
+
+```text
 Implemente a Fase F3 (Priorização), histórias US-07 a US-12. Inclua: mover tarefa entre listas; quadrante de Eisenhower sugerido com confirmação por botões; definir prazo (com parsing de datas em PT-BR no fuso do usuário); estimativa de tempo e energia por botões; ordenação manual; e o comando /agora conforme a seção 5 da spec (pergunta tempo e energia, sugere UMA tarefa, botões Concluí/Outra/Adiar/Tô travada; nunca sugere tarefas em status "aguardando"). Testes para a lógica de seleção do /agora e para o parsing de datas. Não avance para F4.
 ```
 
 ### Fase F4 — Rituais + impedimentos
-```
+
+```text
 Implemente a Fase F4, histórias US-14 a US-18 e US-23 a US-29. Inclua: resumo diário matinal; revisão semanal (tarefas paradas + seção de esperas longas conforme PRD §6.4); lembretes por horário; recorrência simples (diária/semanal/mensal); e todo o sistema de impedimentos (PRD §3.6 e §6.6): registrar impedimento nos três momentos, menor próximo passo automático para vaga_grande (chamada focada da seção 4.5 da spec), escolha aguardando-ou-cobrança para dependência de pessoa, criação de subtarefas para decisão/recurso, status "aguardando" com waiting_since, e desbloqueio manual e por gatilho. Use APScheduler (ou JobQueue) conforme seção 6 da spec. Não avance para F5.
 ```
 
 ### Fase F5 — Casal + polimento
-```
+
+```text
 Implemente a Fase F5, histórias US-19, US-20 e US-22. Inclua: comando /casal que formata e envia as tarefas abertas da lista de casal ao grupo configurado (com confirmação antes de enviar); /config para horários, fuso, grupo de casal e parâmetros stale_days/stale_waiting_days; e /buscar por palavra-chave. Revise o tom de todas as mensagens contra docs/05_TEXTOS_DO_BOT.md. Faça uma passada final de segurança usando o checklist da seção 11.6 da spec. Prepare instruções de deploy 24/7 no Railway ou Fly.io, com os segredos configurados como variáveis de ambiente da plataforma.
 ```
 

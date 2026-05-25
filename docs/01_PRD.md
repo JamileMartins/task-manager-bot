@@ -16,6 +16,7 @@ O princípio central é: **capturar deve ser instantâneo; organizar deve ser op
 ### 1.1 Problema
 
 Pessoas com TDAH costumam ter dificuldade em três pontos do fluxo de tarefas:
+
 1. **Captura** — uma ideia ou compromisso surge e precisa ser registrado antes de ser esquecido, sem fricção.
 2. **Organização e priorização** — categorizar, estimar e priorizar exige função executiva, que é justamente o ponto de dificuldade.
 3. **Início e acompanhamento** — paralisia diante de listas longas; tarefas viram um "cemitério" sem revisão.
@@ -23,8 +24,9 @@ Pessoas com TDAH costumam ter dificuldade em três pontos do fluxo de tarefas:
 ### 1.2 Solução
 
 Um bot de Telegram que:
+
 - Aceita captura em linguagem natural ("brain dump"), inclusive múltiplas tarefas numa única mensagem.
-- Usa a API do Claude para interpretar, separar e pré-classificar as tarefas automaticamente, pedindo só uma confirmação em bloco.
+- Usa a Google Gemini API para interpretar, separar e pré-classificar as tarefas automaticamente, pedindo só uma confirmação em bloco.
 - Organiza tarefas em listas/contextos personalizáveis.
 - Aplica a Matriz de Eisenhower de forma assistida (a IA sugere o quadrante; o usuário confirma com um toque).
 - Sugere ativamente "o que fazer agora" com base em tempo disponível e energia.
@@ -34,7 +36,7 @@ Um bot de Telegram que:
 ### 1.3 Objetivos do MVP
 
 | # | Objetivo | Métrica de sucesso |
-|---|----------|--------------------|
+| --- | --- | --- |
 | O1 | Captura sem atrito | Registrar uma tarefa em ≤ 1 mensagem, sem comandos obrigatórios |
 | O2 | Classificação automática | ≥ 80% das tarefas de um brain dump classificadas corretamente sem edição manual |
 | O3 | Reduzir paralisia | Comando "o que faço agora" retorna 1 tarefa sugerida |
@@ -54,7 +56,8 @@ Um bot de Telegram que:
 
 ## 2. Público e persona
 
-**Persona única — Jamile**
+### Persona única — Jamile
+
 - Professora com rotina intensa e viagens frequentes.
 - TDAH, com dificuldade em funções executivas (organizar, priorizar, iniciar).
 - Usa Telegram com frequência (alta familiaridade).
@@ -66,6 +69,7 @@ Um bot de Telegram que:
 ## 3. Conceitos e modelo mental
 
 ### 3.1 Listas / contextos
+
 Agrupam tarefas por área de vida. Personalizáveis (criar, renomear, arquivar). Listas iniciais sugeridas:
 
 - **Trabalho** - coisas relacionadas às atividades de trabalho.
@@ -76,9 +80,11 @@ Agrupam tarefas por área de vida. Personalizáveis (criar, renomear, arquivar).
 - **Ideias** — captura de ideias, não necessariamente acionáveis
 
 ### 3.2 Caixa de entrada (Inbox)
+
 Toda captura cai primeiro numa Inbox. A IA tenta classificar na lista correta; o usuário aprova em bloco. Tarefas não classificadas com confiança ficam na Inbox para triagem.
 
 ### 3.3 Atributos de tarefa
+
 - **Título** (texto curto, obrigatório)
 - **Lista/contexto** (uma)
 - **Prioridade** via Matriz de Eisenhower → quadrante (Q1 a Q4)
@@ -94,7 +100,9 @@ Toda captura cai primeiro numa Inbox. A IA tenta classificar na lista correta; o
 - **Tarefa-pai** (opcional): vínculo de subtarefa para o primeiro passo / obtenção de recurso
 
 ### 3.4 Matriz de Eisenhower
+
 Cada tarefa pode receber um quadrante:
+
 - **Q1 — Urgente + Importante**: fazer agora.
 - **Q2 — Importante, não urgente**: agendar.
 - **Q3 — Urgente, não importante**: delegar/minimizar.
@@ -103,6 +111,7 @@ Cada tarefa pode receber um quadrante:
 A classificação é **assistida**: a IA sugere o quadrante (com base em prazo, palavras-chave e lista) e o usuário confirma ou ajusta com um toque (botões inline).
 
 ### 3.5 Técnicas de gestão de tempo aplicadas
+
 - **Matriz de Eisenhower** — priorização por quadrante.
 - **Time-boxing / estimativa** — campo de tempo estimado, usado na sugestão "o que faço agora".
 - **Energy management** — campo de energia, para casar tarefa com o estado atual.
@@ -117,7 +126,7 @@ Tarefa parada raramente é "preguiça": quase sempre há um **impedimento** não
 **Impedimentos internos (dependem só da usuária — resolvem-se agindo/decidindo agora):**
 
 | Tipo | Sinal típico | Estratégia de desbloqueio |
-|------|--------------|---------------------------|
+| --- | --- | --- |
 | `vaga_grande` | "não sei por onde começar" | IA sugere o **menor próximo passo** (≤ 2 min) e cria como tarefa filha |
 | `decisao_pendente` | "preciso decidir antes" | Transforma "decidir X" na verdadeira primeira tarefa |
 | `aversiva_energia` | chata, ansiogênica, cansativa | Rebaixa estimativa, sugere parear/agendar em horário de pico de energia |
@@ -125,7 +134,7 @@ Tarefa parada raramente é "preguiça": quase sempre há um **impedimento** não
 **Impedimentos externos (dependem de terceiros/recursos/tempo — resolvem-se saindo do radar ativo + criando gatilho de retomada):**
 
 | Tipo | Sinal típico | Estratégia de desbloqueio |
-|------|--------------|---------------------------|
+| --- | --- | --- |
 | `pessoa` | "esperando fulano" | Escolha na hora: status **aguardando** (some do radar) **ou** vira tarefa "cobrar fulano" com lembrete |
 | `recurso_info` | falta dado/material/acesso | Cria subtarefa "obter recurso X" |
 | `data_externa` | só pode ser feita após uma data | Define `due_at` e remove do radar até lá |
@@ -141,7 +150,7 @@ Tarefa parada raramente é "preguiça": quase sempre há um **impedimento** não
 ## 4. Requisitos funcionais (RF)
 
 | ID | Requisito | Prioridade |
-|----|-----------|------------|
+| --- | --- | --- |
 | RF01 | O usuário pode enviar uma mensagem de texto livre e o bot registra como tarefa(s). | Must |
 | RF02 | O bot detecta múltiplas tarefas numa só mensagem (brain dump) e as separa. | Must |
 | RF03 | O bot pré-classifica cada tarefa em uma lista usando a API do Claude. | Must |
@@ -178,7 +187,7 @@ Tarefa parada raramente é "preguiça": quase sempre há um **impedimento** não
 ## 5. Requisitos não-funcionais (RNF)
 
 | ID | Requisito |
-|----|-----------|
+| --- | --- |
 | RNF01 | **Baixo atrito**: ações comuns (capturar, concluir, "o que faço agora") em no máximo 1–2 toques. |
 | RNF02 | **Disponibilidade 24/7** em hospedagem na nuvem. |
 | RNF03 | **Persistência confiável**: nenhuma tarefa pode ser perdida; banco com backup. |
@@ -195,28 +204,34 @@ Tarefa parada raramente é "preguiça": quase sempre há um **impedimento** não
 ## 6. Fluxos principais
 
 ### 6.1 Brain dump (captura + classificação)
+
 1. Usuária envia: *"comprar ração, marcar dentista, ideia: curso de bordado, pagar luz até sexta"*.
 2. Bot chama a API do Claude → separa em 4 tarefas e sugere lista + quadrante + prazo de cada uma.
 3. Bot responde com um resumo numerado e botões: **✅ Aprovar tudo** | **✏️ Ajustar**.
 4. Em "Aprovar tudo", as tarefas são salvas. Em "Ajustar", a usuária corrige item a item.
 
 ### 6.2 O que faço agora
+
 1. Usuária toca em /agora (ou botão).
 2. Bot pergunta (botões): tempo disponível (5/15/30/60+) e energia (alta/média/baixa).
 3. Bot escolhe UMA tarefa que caiba no tempo e energia, priorizando Q1 > Q2, prazo próximo e ordem manual.
 4. Botões: **✅ Concluí** | **⏭️ Outra** | **😴 Adiar**.
 
 ### 6.3 Resumo diário
+
 - Em horário configurado (ex. 8h), bot envia: tarefas com prazo hoje + até 3 focos sugeridos (Q1/Q2).
 
 ### 6.4 Revisão semanal
+
 - Em dia/horário configurado, bot lista tarefas abertas há mais de N dias sem ação e oferece, uma a uma: **Reagendar | Arquivar | Manter**.
 - Em seguida, uma seção de **esperas longas**: tarefas em status `aguardando` há mais de M dias (configurável, padrão 14). Para cada uma, com tom acolhedor ("você está esperando isto há X dias — ainda faz sentido?"), oferece: **Cobrar agora** (cria/dispara a cobrança) | **Desbloquear** (volta para aberta) | **Arquivar** (sem culpa) | **Seguir esperando** (reinicia o contador).
 
 ### 6.5 Exportar casal
+
 - Usuária toca /casal → bot formata as tarefas abertas da lista "Casa (casal)" e envia ao grupo configurado.
 
 ### 6.6 Desbloquear impedimento
+
 1. O bot pergunta (na revisão, ao pular no /agora, ou via "estou travada nessa"): *"O que está te impedindo?"* com botões dos tipos de impedimento.
 2. Conforme o tipo escolhido, dispara a estratégia:
    - **vaga/grande** → IA sugere o menor próximo passo; cria subtarefa de ≤ 2 min; oferece "começar por aqui".
@@ -233,7 +248,7 @@ Tarefa parada raramente é "preguiça": quase sempre há um **impedimento** não
 ## 7. Comandos do bot (proposta)
 
 | Comando | Função |
-|---------|--------|
+| --- | --- |
 | (texto livre) | Captura/brain dump |
 | /agora | Sugestão de uma tarefa para fazer agora |
 | /listas | Ver e gerenciar listas |
@@ -252,7 +267,7 @@ Tarefa parada raramente é "preguiça": quase sempre há um **impedimento** não
 ## 8. Riscos e mitigações
 
 | Risco | Mitigação |
-|-------|-----------|
+| --- | --- |
 | Classificação da IA erra muito e gera retrabalho | Confirmação em bloco + aprendizado por exemplos no prompt; fallback para Inbox |
 | Acúmulo de tarefas (cemitério) | Revisão semanal obrigatória + tom acolhedor |
 | Custo de API sobe com uso intenso | Classificar em lote (uma chamada por brain dump); cache de padrões |

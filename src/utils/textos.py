@@ -225,6 +225,8 @@ def msg_classificacao_resumo(tarefas: list[dict]) -> str:
 
         if t.get("impedimento") == "vaga_grande" and t.get("proximo_passo"):
             linha += f"\n   💡 {t['proximo_passo']}"
+        elif t.get("impedimento_externo"):
+            linha += "\n   ⏳ Criada como aguardando (impedimento externo detectado)"
 
         linhas.append(linha)
 
@@ -259,6 +261,15 @@ MSG_AGORA_NADA = (
     "Aproveita para descansar ou me manda algo novo."
 )
 MSG_AGORA_ADIAR_PENDENTE = "Adiamento chega na próxima versão — por enquanto, pula ou conclui 😊"
+MSG_AGORA_ADIAR_QUANDO = "Para quando você quer adiar? 😴"
+
+
+def msg_agora_adiada(days: int) -> str:
+    if days == 1:
+        return "Guardado para amanhã ✅\nVoltamos a isso depois!"
+    if days <= 3:
+        return f"Guardado para daqui {days} dias ✅\nVoltamos a isso depois!"
+    return "Guardado para a próxima semana ✅\nVoltamos a isso depois!"
 
 
 def msg_agora_tarefa(task, fallback: bool = False) -> str:
@@ -324,6 +335,10 @@ def msg_task_detail(task) -> str:
         lines.append(f"\n⏳ Aguardando — {blocker_label}")
     elif task.blocker_type:
         lines.append(f"\n⚠️ Travada: {_BLOCKER_LABEL.get(task.blocker_type, task.blocker_type)}")
+
+    _REC_LABEL = {"daily": "🔁 Diária", "weekly": "🔁 Semanal", "monthly": "🔁 Mensal"}
+    if task.recurrence and task.recurrence in _REC_LABEL:
+        lines.append(_REC_LABEL[task.recurrence])
 
     if task.next_step:
         lines.append(f"💡 Próximo passo: {task.next_step}")
@@ -399,3 +414,123 @@ MSG_BLOCKER_OBSOLETA = (
 MSG_BLOCKER_ARQUIVADA = "Arquivada sem culpa 🗑️"
 MSG_BLOCKER_KEEP = "Ok, mantida como está."
 MSG_UNBLOCK_OK = "Destravada ✅ Voltou pras suas tarefas ativas."
+
+
+# ---------------------------------------------------------------------------
+# Lembretes (US-17)
+# ---------------------------------------------------------------------------
+
+def msg_lembrete(task_title: str) -> str:
+    return f"⏰ Lembrete!\n\n*{task_title}*\n\nHora de atacar essa."
+
+
+# ---------------------------------------------------------------------------
+# Resumo diário (US-15)
+# ---------------------------------------------------------------------------
+
+MSG_DIARIO_VAZIO = (
+    "Bom dia ☀️\n"
+    "Hoje não tem nada com prazo. Dia livre pra escolher o que faz sentido — "
+    "ou pra descansar, que também conta."
+)
+
+
+def msg_diario_focos(today_tasks: list, focus_tasks: list) -> str:
+    lines = ["Bom dia ☀️\n", "Sem pressão — só os destaques de hoje:\n"]
+    for t in today_tasks:
+        est = f" · {t.estimate_min}min" if t.estimate_min else ""
+        lines.append(f"📅 {t.title}{est}")
+    for t in focus_tasks:
+        est = f" · {t.estimate_min}min" if t.estimate_min else ""
+        lines.append(f"🎯 {t.title}{est}")
+    lines.append("\nSe bater dúvida do que fazer, é só /agora que eu escolho por você.")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Revisão semanal (US-16)
+# ---------------------------------------------------------------------------
+
+MSG_REVISAO_NADA = (
+    "Revisão da semana: nada parado, nada esquecido 🎉\n"
+    "Tá tudo fluindo. Bom fim de semana."
+)
+
+MSG_REVISAO_ESPERAS_ABERTURA = (
+    "Agora as coisas que você tá esperando faz tempo ⏳\n"
+    "Sem stress — só checar se ainda fazem sentido."
+)
+
+
+def msg_revisao_abertura(n: int) -> str:
+    tarefas = "tarefa" if n == 1 else "tarefas"
+    esta = "está" if n == 1 else "estão"
+    s = "" if n == 1 else "s"
+    return (
+        "Hora da revisão da semana 🗂️\n"
+        "Vou ser rápida e nada de cobrança — a ideia é só tirar o peso das costas.\n\n"
+        f"Tenho {n} {tarefas} que {esta} parada{s} há um tempo. Vamos uma por uma?"
+    )
+
+
+def msg_revisao_tarefa(task, dias: int) -> str:
+    d = "dia" if dias == 1 else "dias"
+    return (
+        f"Essa tá parada há {dias} {d}:\n\n"
+        f"👉 {task.title}\n\n"
+        "O que rola com ela?"
+    )
+
+
+def msg_revisao_espera(task, dias: int) -> str:
+    d = "dia" if dias == 1 else "dias"
+    return (
+        f"Você espera essa há {dias} {d}:\n\n"
+        f"👉 {task.title}\n\n"
+        "Ainda faz sentido?"
+    )
+
+
+def msg_revisao_encerramento(stats: dict) -> str:
+    partes = []
+    if stats.get("reagendadas"):
+        partes.append(f"reagendou {stats['reagendadas']}")
+    if stats.get("arquivadas"):
+        partes.append(f"arquivou {stats['arquivadas']}")
+    if stats.get("destravadas"):
+        partes.append(f"destravou {stats['destravadas']}")
+    resumo = (", ".join(partes) + ".").capitalize() if partes else "Tudo mantido como estava."
+    return (
+        f"Pronto, revisão fechada 🙌\n"
+        f"{resumo}\n\n"
+        "Isso já deixa sua semana mais leve. Até a próxima."
+    )
+
+
+# ---------------------------------------------------------------------------
+# /config (US-20)
+# ---------------------------------------------------------------------------
+
+_DOW_PT: dict[int, str] = {
+    0: "segunda-feira", 1: "terça-feira", 2: "quarta-feira",
+    3: "quinta-feira", 4: "sexta-feira", 5: "sábado", 6: "domingo",
+}
+
+
+def msg_config_status(cfg) -> str:
+    if cfg is None or cfg.daily_summary_time is None:
+        diario = "desativado"
+    else:
+        diario = cfg.daily_summary_time.strftime("%H:%M")
+
+    if cfg is None or cfg.weekly_review_dow is None or cfg.weekly_review_time is None:
+        revisao = "desativada"
+    else:
+        dow = _DOW_PT.get(cfg.weekly_review_dow, str(cfg.weekly_review_dow))
+        revisao = f"{dow} às {cfg.weekly_review_time.strftime('%H:%M')}"
+
+    return (
+        "⚙️ Configurações\n\n"
+        f"☀️ Resumo diário: {diario}\n"
+        f"🗂️ Revisão semanal: {revisao}"
+    )

@@ -11,6 +11,7 @@
 O serviço recebe um texto livre (uma ou várias tarefas) e devolve **somente** um JSON estruturado. Uma única chamada por brain dump. O modelo recomendado é o definido em `ANTHROPIC_MODEL`. A temperatura deve ser **baixa** (0–0.3) para classificação consistente.
 
 Fluxo:
+
 1. Montar o **system prompt** (seção 3) com as listas reais do usuário e a data/fuso.
 2. Enviar o texto do usuário como mensagem `user` (seção 4).
 3. Fazer parsing seguro do JSON (seção 6).
@@ -21,7 +22,7 @@ Fluxo:
 ## 2. Variáveis injetadas em tempo de execução
 
 | Variável | Origem | Exemplo |
-|----------|--------|---------|
+| --- | --- | --- |
 | `{listas}` | nomes das listas ativas do usuário | `Trabalho, Casa (solo), Casa (casal), Saúde, Ideias` |
 | `{agora}` | data/hora atual | `2026-05-25 14:30` |
 | `{timezone}` | `users.timezone` | `America/Fortaleza` |
@@ -32,7 +33,7 @@ Fluxo:
 
 ## 3. System prompt (texto de produção)
 
-```
+```prompt
 Você é um classificador de tarefas de um assistente pessoal de produtividade no Telegram, voltado a uma pessoa com TDAH. Seu único trabalho é transformar texto livre em tarefas estruturadas. Você NÃO conversa, NÃO faz perguntas, NÃO comenta: apenas devolve JSON.
 
 CONTEXTO ATUAL
@@ -87,7 +88,7 @@ FORMATO DE SAÍDA (exato)
 
 Envie o texto bruto do usuário sem alterações, opcionalmente prefixado para deixar claro que é conteúdo a classificar:
 
-```
+```prompt
 Texto para classificar:
 """
 {texto_do_usuario}
@@ -101,11 +102,15 @@ Texto para classificar:
 Inclua 2–3 destes exemplos como pares user/assistant antes da mensagem real, para fixar o formato e o estilo. Eles refletem o contexto de vida da usuária (docência no IFCE, casa, saúde, ideias).
 
 ### Exemplo A — brain dump misto
+
 **Usuário:**
-```
+
+```prompt
 lançar as notas da N1 de sistemas operacionais até sexta, comprar café, marcar retorno com a dermato, ideia: fazer um quadro kanban pro projeto integrador, preciso responder o email do coordenador mas to esperando ele mandar o anexo
 ```
+
 **Assistente:**
+
 ```json
 {"tarefas":[
 {"titulo":"Lançar as notas da N1 de Sistemas Operacionais","lista_sugerida":"Trabalho","quadrante_sugerido":1,"prazo_sugerido":"2026-05-29T09:00:00-03:00","estimativa_min":60,"energia":"media","impedimento":null,"impedimento_externo":false,"proximo_passo":null,"confianca":0.95},
@@ -117,11 +122,15 @@ lançar as notas da N1 de sistemas operacionais até sexta, comprar café, marca
 ```
 
 ### Exemplo B — tarefa única, vaga
+
 **Usuário:**
-```
+
+```prompt
 organizar as coisas do semestre
 ```
+
 **Assistente:**
+
 ```json
 {"tarefas":[
 {"titulo":"Organizar as coisas do semestre","lista_sugerida":"Trabalho","quadrante_sugerido":2,"prazo_sugerido":null,"estimativa_min":120,"energia":"alta","impedimento":"vaga_grande","impedimento_externo":false,"proximo_passo":"Listar em uma nota quais disciplinas e pendências existem neste semestre","confianca":0.7}
@@ -129,11 +138,15 @@ organizar as coisas do semestre
 ```
 
 ### Exemplo C — casal + recurso faltante
+
 **Usuário:**
-```
+
+```prompt
 combinar com o marido quem leva o carro pra revisão, e instalar a prateleira nova mas ainda falta comprar as buchas
 ```
+
 **Assistente:**
+
 ```json
 {"tarefas":[
 {"titulo":"Combinar quem leva o carro para a revisão","lista_sugerida":"Casa (casal)","quadrante_sugerido":2,"prazo_sugerido":null,"estimativa_min":5,"energia":"baixa","impedimento":"pessoa","impedimento_externo":true,"proximo_passo":null,"confianca":0.85},
@@ -146,6 +159,7 @@ combinar com o marido quem leva o carro pra revisão, e instalar a prateleira no
 ## 6. Parsing seguro da resposta
 
 Passos no código:
+
 1. Concatenar todos os blocos de texto da resposta.
 2. Remover eventuais cercas de código (```` ```json ````), por segurança, mesmo o prompt proibindo.
 3. `json.loads`. Se falhar, tentar extrair o maior trecho entre a primeira `{` e a última `}`.
@@ -153,6 +167,7 @@ Passos no código:
 5. Se nada for recuperável → **fallback**: criar UMA tarefa com o texto original na Inbox, sem classificação (RNF08).
 
 Pseudocódigo:
+
 ```python
 def parse_resposta(texto_resposta: str, texto_original: str) -> list[dict]:
     bruto = limpar_cercas(texto_resposta).strip()
@@ -171,6 +186,7 @@ def parse_resposta(texto_resposta: str, texto_original: str) -> list[dict]:
 ## 7. Pós-processamento (regras de negócio)
 
 Aplicadas após o parsing, no serviço (não na IA):
+
 - **Confiança baixa** (`confianca < 0.6`) **ou** `lista_sugerida` nula → tarefa vai para a **Inbox** (`list_id = null`), preservando os demais campos sugeridos.
 - **Lista inexistente**: se `lista_sugerida` não casar com nenhuma lista ativa (case-insensitive, ignorando acentos), tratar como nula → Inbox.
 - **Impedimento externo** (`impedimento_externo = true`) → criar tarefa já em `status = 'aguardando'` e gravar `waiting_since = now()`.
@@ -186,13 +202,17 @@ Aplicadas após o parsing, no serviço (não na IA):
 Usado quando a usuária toca em "Estou travada nessa" ou escolhe o impedimento `vaga_grande` fora do fluxo de captura. Chamada separada, resposta de uma linha.
 
 **System:**
-```
+
+```prompt
 Você ajuda uma pessoa com TDAH a destravar uma tarefa. Dada UMA tarefa, responda apenas com a menor ação física possível para começar agora, executável em até 2 minutos, concreta e no imperativo. Sem listas, sem explicação, sem mais de uma frase. Em português do Brasil.
 ```
+
 **User:**
-```
+
+```prompt
 Tarefa: "{titulo}". Contexto/nota: "{notas_ou_vazio}".
 ```
+
 Saída esperada: uma frase curta, ex.: `Abrir o Moodle e clicar em "Lançar notas" da turma.`
 
 ---

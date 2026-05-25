@@ -11,7 +11,7 @@ from telegram.ext import (
     filters,
 )
 
-from src.config import TELEGRAM_BOT_TOKEN
+from src.config import AUTHORIZED_CHAT_ID, TELEGRAM_BOT_TOKEN
 from src.db.session import create_tables
 from src.handlers.blocker import (
     cb_blocker_aguardar,
@@ -28,8 +28,33 @@ from src.handlers.blocker import (
     cb_blocker_type,
     cb_unblock,
 )
+from src.handlers.config_handler import (
+    cb_config_back,
+    cb_config_daily,
+    cb_config_off_daily,
+    cb_config_off_rev,
+    cb_config_rev_dow,
+    cb_config_set_daily,
+    cb_config_set_dow,
+    cb_config_set_rtime,
+    cmd_config,
+)
+from src.handlers.rituals import (
+    cb_rev_arch,
+    cb_rev_date,
+    cb_rev_manter,
+    cb_rev_reagendar,
+    cb_rev_skip,
+    cb_rev_start,
+    cb_rev_wait_arch,
+    cb_rev_wait_cobrar,
+    cb_rev_wait_destravar,
+    cb_rev_wait_seguir,
+    setup_jobs,
+)
 from src.handlers.agora import (
     cb_agora_adiar,
+    cb_agora_adiar_date,
     cb_agora_concluir,
     cb_agora_energia,
     cb_agora_outra,
@@ -69,6 +94,7 @@ from src.handlers.task_detail import (
     cb_task_set_energy,
     cb_task_set_estimate,
     cb_task_set_quadrant,
+    cb_task_set_recurrence,
     cb_task_start_move,
 )
 from src.handlers.tasks import (
@@ -104,6 +130,7 @@ def main() -> None:
     app.add_handler(CommandHandler("reiniciar", cmd_reiniciar))
     app.add_handler(CommandHandler("agora", cmd_agora))
     app.add_handler(CommandHandler("quadrantes", cmd_quadrantes))
+    app.add_handler(CommandHandler("config", cmd_config))
 
     # ConversationHandler de listas (antes do capture handler)
     app.add_handler(list_conversation)
@@ -123,12 +150,35 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(cb_blocker_keep, pattern=r"^blk_keep:"))
     app.add_handler(CallbackQueryHandler(cb_unblock, pattern=r"^unblock:"))
 
+    # Revisão semanal
+    app.add_handler(CallbackQueryHandler(cb_rev_start, pattern=r"^rv_start$"))
+    app.add_handler(CallbackQueryHandler(cb_rev_skip, pattern=r"^rv_skip$"))
+    app.add_handler(CallbackQueryHandler(cb_rev_reagendar, pattern=r"^rv_rg:"))
+    app.add_handler(CallbackQueryHandler(cb_rev_date, pattern=r"^rv_rd:"))
+    app.add_handler(CallbackQueryHandler(cb_rev_manter, pattern=r"^rv_ok:"))
+    app.add_handler(CallbackQueryHandler(cb_rev_arch, pattern=r"^rv_arch:"))
+    app.add_handler(CallbackQueryHandler(cb_rev_wait_cobrar, pattern=r"^rv_wc:"))
+    app.add_handler(CallbackQueryHandler(cb_rev_wait_destravar, pattern=r"^rv_wu:"))
+    app.add_handler(CallbackQueryHandler(cb_rev_wait_arch, pattern=r"^rv_wa:"))
+    app.add_handler(CallbackQueryHandler(cb_rev_wait_seguir, pattern=r"^rv_ws:"))
+
+    # /config
+    app.add_handler(CallbackQueryHandler(cb_config_daily, pattern=r"^cfg_daily$"))
+    app.add_handler(CallbackQueryHandler(cb_config_set_daily, pattern=r"^cfg_dt:"))
+    app.add_handler(CallbackQueryHandler(cb_config_rev_dow, pattern=r"^cfg_rev_dow$"))
+    app.add_handler(CallbackQueryHandler(cb_config_set_dow, pattern=r"^cfg_rdow:"))
+    app.add_handler(CallbackQueryHandler(cb_config_set_rtime, pattern=r"^cfg_rt:"))
+    app.add_handler(CallbackQueryHandler(cb_config_off_daily, pattern=r"^cfg_off_daily$"))
+    app.add_handler(CallbackQueryHandler(cb_config_off_rev, pattern=r"^cfg_off_rev$"))
+    app.add_handler(CallbackQueryHandler(cb_config_back, pattern=r"^cfg_back$"))
+
     # /agora
     app.add_handler(CallbackQueryHandler(cb_agora_tempo, pattern=r"^ag_t:"))
     app.add_handler(CallbackQueryHandler(cb_agora_energia, pattern=r"^ag_e:"))
     app.add_handler(CallbackQueryHandler(cb_agora_concluir, pattern=r"^ag_ok:"))
     app.add_handler(CallbackQueryHandler(cb_agora_outra, pattern=r"^ag_nx:"))
     app.add_handler(CallbackQueryHandler(cb_agora_adiar, pattern=r"^ag_ad:"))
+    app.add_handler(CallbackQueryHandler(cb_agora_adiar_date, pattern=r"^ag_adf:"))
 
     # Detalhe e edição de tarefa
     app.add_handler(CallbackQueryHandler(cb_task_detail, pattern=r"^task_dt:"))
@@ -136,6 +186,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(cb_task_set_energy, pattern=r"^task_e:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_estimate, pattern=r"^task_m:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_due, pattern=r"^task_d:"))
+    app.add_handler(CallbackQueryHandler(cb_task_set_recurrence, pattern=r"^task_rec:"))
     app.add_handler(CallbackQueryHandler(cb_task_start_move, pattern=r"^task_list:"))
     app.add_handler(CallbackQueryHandler(cb_task_move_to, pattern=r"^mv:"))
     app.add_handler(CallbackQueryHandler(cb_task_reorder, pattern=r"^task_up:"))
@@ -164,6 +215,8 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_capture))
 
     app.add_error_handler(error_handler)
+
+    setup_jobs(app, AUTHORIZED_CHAT_ID)
 
     logger.info("Bot pronto. Iniciando long polling...")
     app.run_polling(drop_pending_updates=True)
