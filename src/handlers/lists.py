@@ -6,6 +6,7 @@ import logging
 import uuid
 
 from telegram import Update
+from telegram.constants import ChatAction
 from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
@@ -61,6 +62,7 @@ async def cmd_listas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await deny_unauthorized(update)
         return
     try:
+        await update.message.reply_chat_action(ChatAction.TYPING)
         await _show_lists(update.message, update.effective_chat.id, via_message=True)
     except Exception:
         logger.exception("Erro em /listas")
