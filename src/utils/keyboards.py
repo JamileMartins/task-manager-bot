@@ -23,10 +23,11 @@ def kb_undo_capture(task_id: uuid.UUID) -> InlineKeyboardMarkup:
 # Listas
 # ---------------------------------------------------------------------------
 
-def kb_listas(lists_with_count: list[tuple[TaskList, int]], inbox_count: int) -> InlineKeyboardMarkup:
+def kb_listas(lists: list, inbox_count: int) -> InlineKeyboardMarkup:
     from src.utils.textos import lista_emoji
     rows = []
-    for lst, count in lists_with_count:
+    for lst in lists:
+        count = lst.open_task_count
         emoji = lista_emoji(lst.slug)
         label = f"{emoji} {lst.name} — {count} {'aberta' if count == 1 else 'abertas'}"
         rows.append([InlineKeyboardButton(label, callback_data=f"view_list:{lst.id}")])

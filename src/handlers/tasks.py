@@ -86,30 +86,12 @@ async def cb_complete_task(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def _refresh_after_complete(query, chat_id: int, completed_task_id: str) -> None:
-    """Reexibe a lista atualizada após conclusão."""
-    # Descobre de qual lista veio o botão pelo contexto da mensagem atual
-    # Como não guardamos o list_id no estado, fazemos back_to_lists
     lists = await asyncio.to_thread(task_service.get_user_lists, chat_id)
     inbox_count = await asyncio.to_thread(task_service.get_inbox_count, chat_id)
 
-    lista_tuples = [
-        (type("L", (), {"id": l.id, "name": l.name, "slug": l.slug})(), l.open_task_count)
-        for l in lists
-    ]
-    # Monta objeto compatível com kb_listas
-    from src.db.models import TaskList
-    real_tuples = []
-    for li in lists:
-        fake = TaskList.__new__(TaskList)
-        fake.id = li.id
-        fake.name = li.name
-        fake.slug = li.slug
-        fake.is_couple = li.is_couple
-        real_tuples.append((fake, li.open_task_count))
-
     await query.edit_message_text(
         f"{textos.msg_conclusao()}\n\n{textos.MSG_SUAS_LISTAS}",
-        reply_markup=keyboards.kb_listas(real_tuples, inbox_count),
+        reply_markup=keyboards.kb_listas(lists, inbox_count),
     )
 
 
@@ -122,20 +104,10 @@ async def cb_back_to_lists(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def _show_lists(query, chat_id: int) -> None:
-    from src.db.models import TaskList
     lists = await asyncio.to_thread(task_service.get_user_lists, chat_id)
     inbox_count = await asyncio.to_thread(task_service.get_inbox_count, chat_id)
 
-    real_tuples = []
-    for li in lists:
-        fake = TaskList.__new__(TaskList)
-        fake.id = li.id
-        fake.name = li.name
-        fake.slug = li.slug
-        fake.is_couple = li.is_couple
-        real_tuples.append((fake, li.open_task_count))
-
     await query.edit_message_text(
         textos.MSG_SUAS_LISTAS,
-        reply_markup=keyboards.kb_listas(real_tuples, inbox_count),
+        reply_markup=keyboards.kb_listas(lists, inbox_count),
     )

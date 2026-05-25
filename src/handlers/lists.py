@@ -16,7 +16,6 @@ from telegram.ext import (
     filters,
 )
 
-from src.db.models import TaskList
 from src.handlers.common import deny_unauthorized, is_authorized
 from src.services import task_service
 from src.utils import keyboards, textos
@@ -36,16 +35,7 @@ async def _show_lists(update_or_query, chat_id: int, *, via_message: bool = Fals
     lists = await asyncio.to_thread(task_service.get_user_lists, chat_id)
     inbox_count = await asyncio.to_thread(task_service.get_inbox_count, chat_id)
 
-    real_tuples: list[tuple[TaskList, int]] = []
-    for li in lists:
-        fake = TaskList.__new__(TaskList)
-        fake.id = li.id
-        fake.name = li.name
-        fake.slug = li.slug
-        fake.is_couple = li.is_couple
-        real_tuples.append((fake, li.open_task_count))
-
-    kb = keyboards.kb_listas(real_tuples, inbox_count)
+    kb = keyboards.kb_listas(lists, inbox_count)
 
     if via_message:
         await update_or_query.reply_text(textos.MSG_SUAS_LISTAS, reply_markup=kb)
