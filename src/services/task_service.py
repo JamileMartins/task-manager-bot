@@ -250,6 +250,51 @@ def get_inbox_tasks(chat_id: int) -> list[Task]:
         ).all()
 
 
+def get_couple_tasks(chat_id: int) -> tuple[list[Task], int | None]:
+    """Retorna (tarefas abertas da lista de casal, group_chat_id configurado)."""
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return [], None
+        couple_list = session.scalar(
+            select(TaskList).where(
+                TaskList.user_id == user.id,
+                TaskList.is_couple.is_(True),
+                TaskList.archived.is_(False),
+            )
+        )
+        tasks: list[Task] = []
+        if couple_list:
+            tasks = list(session.scalars(
+                select(Task)
+                .where(Task.list_id == couple_list.id, Task.status == "aberta")
+                .order_by(Task.quadrant.nullslast(), Task.sort_order)
+            ).all())
+        cfg = session.scalar(select(Config).where(Config.user_id == user.id))
+        group_id = cfg.couple_group_chat_id if cfg else None
+        return tasks, group_id
+
+
+def search_tasks(chat_id: int, term: str) -> list[Task]:
+    """Busca tarefas não concluídas/arquivadas por palavra-chave no título ou notas."""
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return []
+        pattern = f"%{term}%"
+        return list(session.scalars(
+            select(Task)
+            .options(selectinload(Task.task_list))
+            .where(
+                Task.user_id == user.id,
+                Task.status.not_in(["concluida", "arquivada"]),
+                or_(Task.title.ilike(pattern), Task.notes.ilike(pattern)),
+            )
+            .order_by(Task.status, Task.quadrant.nullslast(), Task.sort_order)
+            .limit(20)
+        ).all())
+
+
 def create_list(chat_id: int, name: str) -> Optional[TaskList]:
     with get_session() as session:
         user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
