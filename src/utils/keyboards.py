@@ -282,6 +282,88 @@ def kb_blocker_obsoleta(task_id: uuid.UUID) -> InlineKeyboardMarkup:
     ]])
 
 
+# ---------------------------------------------------------------------------
+# Revisão semanal (US-16)
+# ---------------------------------------------------------------------------
+
+def kb_revisao_abertura() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("👍 Bora", callback_data="rv_start"),
+        InlineKeyboardButton("⏰ Agora não", callback_data="rv_skip"),
+    ]])
+
+
+def kb_revisao_tarefa(task_id) -> InlineKeyboardMarkup:
+    tid = str(task_id)
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📅 Reagendar", callback_data=f"rv_rg:{tid}"),
+            InlineKeyboardButton("🗑️ Arquivar", callback_data=f"rv_arch:{tid}"),
+        ],
+        [InlineKeyboardButton("✋ Manter", callback_data=f"rv_ok:{tid}")],
+    ])
+
+
+def kb_revisao_reagendar(task_id) -> InlineKeyboardMarkup:
+    tid = str(task_id)
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("Amanhã", callback_data=f"rv_rd:{tid}:1"),
+        InlineKeyboardButton("1 semana", callback_data=f"rv_rd:{tid}:7"),
+        InlineKeyboardButton("2 semanas", callback_data=f"rv_rd:{tid}:14"),
+    ]])
+
+
+def kb_revisao_espera(task_id) -> InlineKeyboardMarkup:
+    tid = str(task_id)
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🔔 Cobrar agora", callback_data=f"rv_wc:{tid}"),
+            InlineKeyboardButton("✅ Destravar", callback_data=f"rv_wu:{tid}"),
+        ],
+        [
+            InlineKeyboardButton("🗑️ Arquivar", callback_data=f"rv_wa:{tid}"),
+            InlineKeyboardButton("⏳ Seguir esperando", callback_data=f"rv_ws:{tid}"),
+        ],
+    ])
+
+
+# ---------------------------------------------------------------------------
+# /config (US-20)
+# ---------------------------------------------------------------------------
+
+def kb_config() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("⏰ Horário diário", callback_data="cfg_daily"),
+            InlineKeyboardButton("🗓️ Dia da revisão", callback_data="cfg_rev_dow"),
+        ],
+        [
+            InlineKeyboardButton("🔕 Desativar diário", callback_data="cfg_off_daily"),
+            InlineKeyboardButton("🔕 Desativar revisão", callback_data="cfg_off_rev"),
+        ],
+    ])
+
+
+def kb_config_daily_time() -> InlineKeyboardMarkup:
+    opts = [("6:00", "06:00"), ("7:00", "07:00"), ("8:00", "08:00"), ("9:00", "09:00")]
+    row = [InlineKeyboardButton(label, callback_data=f"cfg_dt:{val}") for label, val in opts]
+    return InlineKeyboardMarkup([row, [InlineKeyboardButton("← Voltar", callback_data="cfg_back")]])
+
+
+def kb_config_review_dow() -> InlineKeyboardMarkup:
+    days = [("Seg", "0"), ("Ter", "1"), ("Qua", "2"), ("Qui", "3"),
+            ("Sex", "4"), ("Sáb", "5"), ("Dom", "6")]
+    row1 = [InlineKeyboardButton(l, callback_data=f"cfg_rdow:{v}") for l, v in days[:4]]
+    row2 = [InlineKeyboardButton(l, callback_data=f"cfg_rdow:{v}") for l, v in days[4:]]
+    return InlineKeyboardMarkup([row1, row2, [InlineKeyboardButton("← Voltar", callback_data="cfg_back")]])
+
+
+def kb_config_review_time() -> InlineKeyboardMarkup:
+    opts = [("8:00", "08:00"), ("18:00", "18:00"), ("19:00", "19:00"), ("20:00", "20:00")]
+    row = [InlineKeyboardButton(label, callback_data=f"cfg_rt:{val}") for label, val in opts]
+    return InlineKeyboardMarkup([row, [InlineKeyboardButton("← Voltar", callback_data="cfg_back")]])
+
+
 def kb_agora_tempo() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [

@@ -5,7 +5,7 @@ import re
 import unicodedata
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy import func, or_, select
@@ -537,6 +537,152 @@ def create_related_task(
         )
         session.add(task)
         session.flush()
+        return task
+
+
+# ---------------------------------------------------------------------------
+# Config (US-20)
+# ---------------------------------------------------------------------------
+
+def get_config(chat_id: int) -> Optional[Config]:
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return None
+        return session.scalar(select(Config).where(Config.user_id == user.id))
+
+
+def update_config(chat_id: int, **kwargs) -> Optional[Config]:
+    _allowed = {
+        "daily_summary_time", "weekly_review_dow", "weekly_review_time",
+        "couple_group_chat_id", "stale_days", "stale_waiting_days",
+    }
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return None
+        cfg = session.scalar(select(Config).where(Config.user_id == user.id))
+        if cfg is None:
+            cfg = Config(user_id=user.id, stale_days=7, stale_waiting_days=14)
+            session.add(cfg)
+            session.flush()
+        for k, v in kwargs.items():
+            if k in _allowed:
+                setattr(cfg, k, v)
+        return cfg
+
+
+# ---------------------------------------------------------------------------
+# Rituais — resumo diário e revisão semanal (US-15, US-16)
+# ---------------------------------------------------------------------------
+
+def get_daily_summary_tasks(chat_id: int) -> tuple[list[Task], list[Task]]:
+    """Retorna (tarefas_com_prazo_hoje, ate_3_focos_Q1Q2)."""
+    import pytz
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return [], []
+
+        tz = pytz.timezone(user.timezone or "America/Fortaleza")
+        now_local = datetime.now(tz)
+        day_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = now_local.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        today_tasks = list(session.scalars(
+            select(Task)
+            .options(selectinload(Task.task_list))
+            .where(
+                Task.user_id == user.id,
+                Task.status == "aberta",
+                Task.due_at >= day_start,
+                Task.due_at <= day_end,
+            )
+            .order_by(Task.due_at)
+        ).all())
+
+        today_ids = [t.id for t in today_tasks]
+
+        q = (
+            select(Task)
+            .options(selectinload(Task.task_list))
+            .where(
+                Task.user_id == user.id,
+                Task.status == "aberta",
+                Task.quadrant.in_([1, 2]),
+            )
+            .order_by(Task.quadrant, Task.sort_order)
+            .limit(3 + len(today_ids))
+        )
+        focus_raw = session.scalars(q).all()
+        focus_tasks = [t for t in focus_raw if t.id not in today_ids][:3]
+
+        return today_tasks, focus_tasks
+
+
+def get_stale_tasks(chat_id: int) -> list[Task]:
+    """Tarefas abertas não tocadas há mais de stale_days dias."""
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return []
+        cfg = session.scalar(select(Config).where(Config.user_id == user.id))
+        stale_days = cfg.stale_days if cfg else 7
+        cutoff = _now() - timedelta(days=stale_days)
+        return list(session.scalars(
+            select(Task)
+            .options(selectinload(Task.task_list))
+            .where(
+                Task.user_id == user.id,
+                Task.status == "aberta",
+                Task.last_touched_at < cutoff,
+            )
+            .order_by(Task.last_touched_at)
+        ).all())
+
+
+def get_stale_waiting_tasks(chat_id: int) -> list[Task]:
+    """Tarefas em 'aguardando' há mais de stale_waiting_days dias."""
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return []
+        cfg = session.scalar(select(Config).where(Config.user_id == user.id))
+        stale_waiting_days = cfg.stale_waiting_days if cfg else 14
+        cutoff = _now() - timedelta(days=stale_waiting_days)
+        return list(session.scalars(
+            select(Task)
+            .options(selectinload(Task.task_list))
+            .where(
+                Task.user_id == user.id,
+                Task.status == "aguardando",
+                Task.waiting_since < cutoff,
+            )
+            .order_by(Task.waiting_since)
+        ).all())
+
+
+def archive_task(task_id: str | uuid.UUID) -> bool:
+    """Arquiva uma tarefa (status='arquivada')."""
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        task = session.get(Task, uid)
+        if task is None:
+            return False
+        task.status = "arquivada"
+        task.last_touched_at = _now()
+        return True
+
+
+def reschedule_task(task_id: str | uuid.UUID, days: int) -> Optional[Task]:
+    """Adia tarefa por N dias a partir de agora."""
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        task = session.get(Task, uid)
+        if task is None:
+            return None
+        task.due_at = _now() + timedelta(days=days)
+        task.last_touched_at = _now()
         return task
 
 
