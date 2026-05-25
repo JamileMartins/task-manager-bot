@@ -9,8 +9,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from src.config import DATABASE_URL
 from src.db.models import Base
 
+_db_url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 engine = create_engine(
-    DATABASE_URL,
+    _db_url,
     pool_pre_ping=True,
     pool_size=5,
     max_overflow=10,
