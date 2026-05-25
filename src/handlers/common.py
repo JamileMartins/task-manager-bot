@@ -98,6 +98,16 @@ async def cmd_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 # /ping
 # ---------------------------------------------------------------------------
 
+async def cmd_quadrantes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_authorized(update):
+        await deny_unauthorized(update)
+        return
+    msg = update.effective_message
+    if not msg:
+        return
+    await msg.reply_text(textos.MSG_GUIA_QUADRANTES)
+
+
 async def cmd_ping(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_authorized(update):
         await deny_unauthorized(update)

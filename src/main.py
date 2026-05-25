@@ -33,6 +33,7 @@ from src.handlers.common import (
     cmd_ajuda,
     cmd_inbox,
     cmd_ping,
+    cmd_quadrantes,
     cmd_reiniciar,
     cmd_start,
     error_handler,
@@ -87,6 +88,7 @@ def main() -> None:
     app.add_handler(CommandHandler("ping", cmd_ping))
     app.add_handler(CommandHandler("reiniciar", cmd_reiniciar))
     app.add_handler(CommandHandler("agora", cmd_agora))
+    app.add_handler(CommandHandler("quadrantes", cmd_quadrantes))
 
     # ConversationHandler de listas (antes do capture handler)
     app.add_handler(list_conversation)

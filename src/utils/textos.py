@@ -40,8 +40,43 @@ MSG_AJUDA = (
     "⚙️ /config — horários e ajustes\n\n"
     "🏓 /ping — verificar se estou funcionando\n"
     "🔄 /reiniciar — reiniciar o bot\n\n"
+    "📖 /quadrantes — o que significam Q1, Q2, Q3, Q4 e como uso a energia\n\n"
     "Dica: você quase nunca precisa de comando. "
     "Só me manda o que vier na cabeça."
+)
+
+MSG_GUIA_QUADRANTES = (
+    "📖 Como o Foco organiza suas tarefas\n\n"
+    "━━━━━━━━━━━━━━━━━━━━\n"
+    "🗂 Matriz de Eisenhower\n\n"
+    "Cada tarefa cai num dos quatro quadrantes:\n\n"
+    "🔴 Q1 — Urgente e importante\n"
+    "Prazo curto e consequência real. Fazer agora.\n"
+    'Ex.: "entregar relatório hoje", "consulta médica amanhã"\n\n'
+    "🟡 Q2 — Importante, sem urgência\n"
+    "Sem prazo imediato, mas é o que move sua vida de verdade. "
+    "Priorizar antes que vire Q1.\n"
+    'Ex.: "estudar para a certificação", "planejar as férias"\n\n'
+    "🔵 Q3 — Urgente, mas não importante\n"
+    "Alguém pediu ou tem prazo, mas não é essencial pra você. "
+    "Fazer rápido ou delegar.\n"
+    'Ex.: "responder e-mail de rotina", "preencher formulário"\n\n'
+    "⚪ Q4 — Nem urgente nem importante\n"
+    "Questione se realmente precisa ser feito. Talvez possa arquivar.\n"
+    'Ex.: "organizar pasta de fotos de 2019", "pesquisa sem uso"\n\n'
+    "━━━━━━━━━━━━━━━━━━━━\n"
+    "⚡ Níveis de energia\n\n"
+    "O /agora usa o seu nível de energia pra escolher a tarefa certa:\n\n"
+    "⚡ Alta — tarefas que exigem foco, decisão ou criatividade\n"
+    "🔋 Média — tarefas operacionais, comunicação, organização\n"
+    "🪫 Baixa — tarefas mecânicas, leituras leves, revisões simples\n\n"
+    "━━━━━━━━━━━━━━━━━━━━\n"
+    "🧠 Como o Foco pensa\n\n"
+    "1. Você manda texto livre — eu identifico e separo as tarefas\n"
+    "2. A IA sugere lista, quadrante, tempo e energia de cada uma\n"
+    "3. Você aprova em bloco ou ajusta item a item\n"
+    "4. /agora filtra por tempo e energia e te dá UMA tarefa\n"
+    "5. A revisão semanal cuida do que ficou parado"
 )
 
 
