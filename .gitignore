@@ -1,0 +1,33 @@
+# Segredos e ambiente — NUNCA versionar
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+credentials.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Banco local (se usar SQLite em dev)
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs e temporários
+*.log
+logs/
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
