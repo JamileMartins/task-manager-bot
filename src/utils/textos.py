@@ -38,9 +38,18 @@ MSG_AJUDA = (
     "👫 /casal — mandar as tarefas de casa pro grupo\n"
     "🔍 /buscar <palavra> — achar uma tarefa\n"
     "⚙️ /config — horários e ajustes\n\n"
+    "🏓 /ping — verificar se estou funcionando\n"
+    "🔄 /reiniciar — reiniciar o bot\n\n"
     "Dica: você quase nunca precisa de comando. "
     "Só me manda o que vier na cabeça."
 )
+
+
+def msg_ping(agora: str) -> str:
+    return f"Funcionando ✅ — {agora}"
+
+
+MSG_REINICIANDO = "Reiniciando... 🔄"
 
 
 # ---------------------------------------------------------------------------

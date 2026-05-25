@@ -14,7 +14,14 @@ from telegram.ext import (
 from src.config import TELEGRAM_BOT_TOKEN
 from src.db.session import create_tables
 from src.handlers.capture import cb_undo_capture, handle_capture
-from src.handlers.common import cmd_ajuda, cmd_inbox, cmd_start
+from src.handlers.common import (
+    cmd_ajuda,
+    cmd_inbox,
+    cmd_ping,
+    cmd_reiniciar,
+    cmd_start,
+    error_handler,
+)
 from src.handlers.lists import (
     cb_archive_list,
     cb_cancel_mgmt,
@@ -52,6 +59,8 @@ def main() -> None:
     app.add_handler(CommandHandler("help", cmd_ajuda))
     app.add_handler(CommandHandler("listas", cmd_listas))
     app.add_handler(CommandHandler("inbox", cmd_inbox))
+    app.add_handler(CommandHandler("ping", cmd_ping))
+    app.add_handler(CommandHandler("reiniciar", cmd_reiniciar))
 
     # ConversationHandler de listas (deve vir antes do capture handler)
     app.add_handler(list_conversation)
@@ -71,6 +80,8 @@ def main() -> None:
 
     # Captura por texto livre — deve ser o último handler de mensagens
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_capture))
+
+    app.add_error_handler(error_handler)
 
     logger.info("Bot pronto. Iniciando long polling...")
     app.run_polling(drop_pending_updates=True)
