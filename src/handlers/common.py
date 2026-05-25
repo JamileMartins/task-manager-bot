@@ -136,6 +136,81 @@ async def cmd_reiniciar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 # ---------------------------------------------------------------------------
+# /casal (US-19)
+# ---------------------------------------------------------------------------
+
+async def cmd_casal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_authorized(update):
+        await deny_unauthorized(update)
+        return
+    msg = update.effective_message
+    if not msg:
+        return
+    try:
+        await msg.reply_chat_action(ChatAction.TYPING)
+        chat_id = update.effective_chat.id
+        tasks, group_id = await asyncio.to_thread(task_service.get_couple_tasks, chat_id)
+        if not tasks:
+            await msg.reply_text(textos.MSG_CASAL_VAZIA)
+            return
+        texto = textos.msg_casal(tasks)
+        if group_id:
+            await context.bot.send_message(group_id, texto)
+            await msg.reply_text(textos.MSG_CASAL_ENVIADO)
+        else:
+            await msg.reply_text(texto + "\n\n" + textos.MSG_CASAL_SEM_GRUPO)
+    except Exception:
+        logger.exception("Erro em /casal")
+        await msg.reply_text(textos.MSG_ERRO_GENERICO)
+
+
+async def cmd_setgrupo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Registra o grupo atual como grupo do casal (chamado de dentro de um grupo)."""
+    if not update.effective_chat:
+        return
+    if update.effective_chat.type not in ("group", "supergroup"):
+        msg = update.effective_message
+        if msg:
+            await msg.reply_text(textos.MSG_SETGRUPO_APENAS_GRUPO)
+        return
+    group_chat_id = update.effective_chat.id
+    await asyncio.to_thread(task_service.update_config, AUTHORIZED_CHAT_ID, couple_group_chat_id=group_chat_id)
+    msg = update.effective_message
+    if msg:
+        await msg.reply_text(textos.MSG_SETGRUPO_OK)
+
+
+# ---------------------------------------------------------------------------
+# /buscar (US-22)
+# ---------------------------------------------------------------------------
+
+async def cmd_buscar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_authorized(update):
+        await deny_unauthorized(update)
+        return
+    msg = update.effective_message
+    if not msg:
+        return
+    term = " ".join(context.args).strip() if context.args else ""
+    if not term:
+        await msg.reply_text(textos.MSG_BUSCA_SEM_TERMO)
+        return
+    try:
+        await msg.reply_chat_action(ChatAction.TYPING)
+        tasks = await asyncio.to_thread(task_service.search_tasks, update.effective_chat.id, term)
+        if not tasks:
+            await msg.reply_text(textos.MSG_BUSCA_VAZIA)
+            return
+        await msg.reply_text(
+            textos.msg_busca(tasks, term),
+            reply_markup=keyboards.kb_tasks(tasks),
+        )
+    except Exception:
+        logger.exception("Erro em /buscar")
+        await msg.reply_text(textos.MSG_ERRO_GENERICO)
+
+
+# ---------------------------------------------------------------------------
 # Error handler global
 # ---------------------------------------------------------------------------
 

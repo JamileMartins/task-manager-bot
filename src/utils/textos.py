@@ -508,6 +508,58 @@ def msg_revisao_encerramento(stats: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# /casal (US-19)
+# ---------------------------------------------------------------------------
+
+MSG_CASAL_VAZIA = (
+    "A lista de casa (casal) tá vazia 🏠\n"
+    "Ainda não tem tarefas abertas por aqui."
+)
+
+MSG_CASAL_SEM_GRUPO = (
+    "Grupo do casal ainda não configurado 👫\n\n"
+    "Adicione o bot ao grupo e mande /setgrupo lá pra vincular."
+)
+
+MSG_CASAL_ENVIADO = "Enviado para o grupo do casal ✅"
+
+MSG_SETGRUPO_OK = "Grupo registrado ✅ Agora o /casal vai enviar as tarefas aqui."
+
+MSG_SETGRUPO_APENAS_GRUPO = "Use esse comando em um grupo onde o casal está."
+
+
+def msg_casal(tasks: list) -> str:
+    n = len(tasks)
+    header = f"🏠 Casa (casal) — {n} {'tarefa' if n == 1 else 'tarefas'}:\n"
+    lines = [header]
+    for t in tasks:
+        q = QUADRANT_EMOJI.get(t.quadrant, "◾") if t.quadrant else "◾"
+        est = f" · {t.estimate_min}min" if t.estimate_min else ""
+        lines.append(f"{q} {t.title}{est}")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# /buscar (US-22)
+# ---------------------------------------------------------------------------
+
+MSG_BUSCA_SEM_TERMO = "Me diz o que buscar 🔍\nEx.: /buscar reunião"
+
+MSG_BUSCA_VAZIA = "Não encontrei nada com esse termo 🔍\nTenta outra palavra?"
+
+
+def msg_busca(tasks: list, term: str) -> str:
+    n = len(tasks)
+    header = f'🔍 "{term}" — {n} {"tarefa" if n == 1 else "tarefas"}:\n'
+    lines = [header]
+    for t in tasks:
+        lista = t.task_list.name if t.task_list else "📥 Inbox"
+        status_icon = "⏳" if t.status == "aguardando" else "◾"
+        lines.append(f"{status_icon} {t.title}\n   → {lista}")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # /config (US-20)
 # ---------------------------------------------------------------------------
 
@@ -529,8 +581,11 @@ def msg_config_status(cfg) -> str:
         dow = _DOW_PT.get(cfg.weekly_review_dow, str(cfg.weekly_review_dow))
         revisao = f"{dow} às {cfg.weekly_review_time.strftime('%H:%M')}"
 
+    casal = "não configurado" if cfg is None or cfg.couple_group_chat_id is None else "configurado ✅"
+
     return (
         "⚙️ Configurações\n\n"
         f"☀️ Resumo diário: {diario}\n"
-        f"🗂️ Revisão semanal: {revisao}"
+        f"🗂️ Revisão semanal: {revisao}\n"
+        f"👫 Grupo do casal: {casal}"
     )
