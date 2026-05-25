@@ -284,6 +284,17 @@ def msg_agora_tarefa(task, fallback: bool = False) -> str:
 # Detalhe e edição de tarefa (F3 — US-07, 08, 09, 10, 11)
 # ---------------------------------------------------------------------------
 
+_BLOCKER_LABEL: dict[str, str] = {
+    "vaga_grande": "🌫️ Grande/vaga",
+    "decisao_pendente": "🤔 Falta decidir",
+    "aversiva_energia": "😖 Chata/pesada",
+    "pessoa": "🧍 Depende de alguém",
+    "recurso_info": "🧩 Falta algo",
+    "data_externa": "📅 Aguardando data",
+    "obsoleta": "🗑️ Não importa mais",
+}
+
+
 def msg_task_detail(task) -> str:
     import pytz
     lista_nome = task.task_list.name if task.task_list else "📥 Inbox"
@@ -308,6 +319,83 @@ def msg_task_detail(task) -> str:
     else:
         lines.append("📅 Sem prazo")
 
+    if task.status == "aguardando":
+        blocker_label = _BLOCKER_LABEL.get(task.blocker_type or "", "impedimento externo")
+        lines.append(f"\n⏳ Aguardando — {blocker_label}")
+    elif task.blocker_type:
+        lines.append(f"\n⚠️ Travada: {_BLOCKER_LABEL.get(task.blocker_type, task.blocker_type)}")
+
     if task.next_step:
-        lines.append(f"\n💡 Próximo passo: {task.next_step}")
+        lines.append(f"💡 Próximo passo: {task.next_step}")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Impedimentos (F4 — US-23 a US-28)
+# ---------------------------------------------------------------------------
+
+def msg_blocker_pergunta(task_title: str) -> str:
+    return f"Sem problema. O que tá travando essa aqui?\n\n👉 {task_title}"
+
+
+def msg_blocker_vaga_sugestao(passo: str) -> str:
+    return (
+        "Essa é grande mesmo. A gente não vai resolver tudo agora — "
+        "só dar o primeiro passinho:\n\n"
+        f"👉 {passo}\n\n"
+        "Leva uns 2 minutos. Topa começar só por aí?"
+    )
+
+
+def msg_blocker_decidir(task_title: str) -> str:
+    return (
+        "Então o verdadeiro primeiro passo é decidir. Vou criar isso como tarefa:\n\n"
+        f"👉 Decidir: {task_title}\n\n"
+        "Quando você decidir, o resto destrava sozinho."
+    )
+
+
+MSG_BLOCKER_PESSOA = "Essa depende de outra pessoa. Como prefere?"
+
+MSG_BLOCKER_AGUARDANDO = (
+    "Belê. Tirei do seu radar por enquanto ⏳\n"
+    "Ela volta na revisão se demorar demais. "
+    "Você não precisa segurar isso na cabeça."
+)
+
+MSG_BLOCKER_COBRAR_QUANDO = "Quando devo te lembrar de cobrar?"
+
+
+def msg_blocker_cobrar_ok(data: str) -> str:
+    return f"Feito 🔔 Vou te lembrar de cobrar em {data}."
+
+
+MSG_BLOCKER_AVERSIVA = (
+    "Entendi, essa pesa. Guardei pra quando você tiver mais energia ⚡\n"
+    "Só aparece no /agora quando você marcar energia alta."
+)
+
+
+def msg_blocker_recurso(task_title: str) -> str:
+    return (
+        "Falta uma coisa antes de fazer essa. Vou criar o passo que destrava:\n\n"
+        f"👉 Obter o necessário para: {task_title}\n\n"
+        "Assim que você tiver isso, a tarefa principal libera."
+    )
+
+
+MSG_BLOCKER_DATA_QUANDO = "Essa só dá pra fazer mais pra frente. A partir de quando?"
+
+
+def msg_blocker_data_ok(data: str) -> str:
+    return f"Combinado 📅 Guardei até {data}. Não te incomodo com ela antes disso."
+
+
+MSG_BLOCKER_OBSOLETA = (
+    "Tudo bem deixar isso ir. Nem tudo que a gente anota continua importante "
+    "— e isso não é falha sua.\n\nArquivo essa pra você?"
+)
+
+MSG_BLOCKER_ARQUIVADA = "Arquivada sem culpa 🗑️"
+MSG_BLOCKER_KEEP = "Ok, mantida como está."
+MSG_UNBLOCK_OK = "Destravada ✅ Voltou pras suas tarefas ativas."

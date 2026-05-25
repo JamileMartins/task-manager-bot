@@ -206,6 +206,38 @@ def parse_resposta(
 # Classificação principal
 # ---------------------------------------------------------------------------
 
+def suggest_next_step(task_title: str) -> str:
+    """Sugere o menor próximo passo físico (≤2 min) para uma tarefa vaga/grande."""
+    if not GEMINI_API_KEY:
+        return "Dar o primeiro passo"
+
+    system = (
+        "Você é um assistente de produtividade para uma pessoa com TDAH. "
+        "Dada uma tarefa vaga ou grande, sugira O MENOR próximo passo físico possível. "
+        "Regras: deve levar ≤ 2 minutos; no imperativo; em português do Brasil; "
+        "sem explicações, apenas o passo. "
+        'Exemplo: "Abrir o documento e escrever o título"'
+    )
+    user_msg = f"Tarefa: {task_title}"
+
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=[types.Content(role="user", parts=[types.Part(text=user_msg)])],
+            config=types.GenerateContentConfig(
+                system_instruction=system,
+                temperature=0.3,
+                max_output_tokens=80,
+            ),
+        )
+        step = (response.text or "").strip().strip('"').strip()
+        return step[:200] if step else "Dar o primeiro passo"
+    except Exception:
+        logger.exception("Erro ao sugerir próximo passo")
+        return "Dar o primeiro passo"
+
+
 def classificar_brain_dump(
     texto: str,
     listas: list[str],

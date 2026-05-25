@@ -428,6 +428,118 @@ def update_task_attrs(task_id: str | uuid.UUID, **kwargs) -> Optional[Task]:
         return task
 
 
+# ---------------------------------------------------------------------------
+# Impedimentos (F4 — US-23, 25, 28)
+# ---------------------------------------------------------------------------
+
+def set_blocker(
+    task_id: str | uuid.UUID,
+    blocker_type: str,
+    *,
+    is_external: bool | None = None,
+) -> Optional[Task]:
+    """Salva o tipo de impedimento na tarefa."""
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    _external_types = {"pessoa", "recurso_info", "data_externa"}
+    if is_external is None:
+        is_external = blocker_type in _external_types
+    with get_session() as session:
+        task = session.get(Task, uid)
+        if task is None:
+            return None
+        task.blocker_type = blocker_type
+        task.blocker_is_external = is_external
+        task.last_touched_at = _now()
+        return task
+
+
+def set_waiting(task_id: str | uuid.UUID, *, due_at: Optional[datetime] = None) -> Optional[Task]:
+    """Coloca a tarefa em status 'aguardando' e registra waiting_since."""
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        task = session.get(Task, uid)
+        if task is None:
+            return None
+        now = _now()
+        task.status = "aguardando"
+        task.waiting_since = now
+        if due_at is not None:
+            task.due_at = due_at
+        task.last_touched_at = now
+        return task
+
+
+def unblock_task(task_id: str | uuid.UUID) -> Optional[Task]:
+    """Desbloqueaia tarefa: volta para 'aberta' e limpa campos de bloqueio."""
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        task = session.get(Task, uid)
+        if task is None:
+            return None
+        task.status = "aberta"
+        task.waiting_since = None
+        task.blocker_type = None
+        task.blocker_is_external = None
+        task.blocker_note = None
+        task.last_touched_at = _now()
+        return task
+
+
+def create_subtask(parent_task_id: str | uuid.UUID, title: str) -> Optional[Task]:
+    """Cria uma subtarefa vinculada à tarefa-pai, na mesma lista."""
+    uid = uuid.UUID(str(parent_task_id)) if isinstance(parent_task_id, str) else parent_task_id
+    with get_session() as session:
+        parent = session.get(Task, uid)
+        if parent is None:
+            return None
+        now = _now()
+        subtask = Task(
+            user_id=parent.user_id,
+            list_id=parent.list_id,
+            parent_task_id=parent.id,
+            title=title[:500],
+            status="aberta",
+            quadrant=parent.quadrant,
+            energy="baixa",
+            estimate_min=5,
+            sort_order=0,
+            created_at=now,
+            last_touched_at=now,
+        )
+        session.add(subtask)
+        session.flush()
+        return subtask
+
+
+def create_related_task(
+    parent_task_id: str | uuid.UUID,
+    title: str,
+    *,
+    quadrant: Optional[int] = 2,
+) -> Optional[Task]:
+    """Cria uma tarefa relacionada (ex.: 'Decidir X') na mesma lista da tarefa-pai."""
+    uid = uuid.UUID(str(parent_task_id)) if isinstance(parent_task_id, str) else parent_task_id
+    with get_session() as session:
+        parent = session.get(Task, uid)
+        if parent is None:
+            return None
+        now = _now()
+        task = Task(
+            user_id=parent.user_id,
+            list_id=parent.list_id,
+            title=title[:500],
+            status="aberta",
+            quadrant=quadrant,
+            energy="media",
+            sort_order=0,
+            created_at=now,
+            last_touched_at=now,
+        )
+        session.add(task)
+        session.flush()
+        return task
+
+
 def reorder_task(task_id: str | uuid.UUID, direction: str) -> bool:
     """Troca sort_order com a tarefa adjacente na mesma lista. direction: 'up' | 'down'."""
     uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id

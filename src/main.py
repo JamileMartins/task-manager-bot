@@ -13,6 +13,21 @@ from telegram.ext import (
 
 from src.config import TELEGRAM_BOT_TOKEN
 from src.db.session import create_tables
+from src.handlers.blocker import (
+    cb_blocker_aguardar,
+    cb_blocker_archive,
+    cb_blocker_cobrar,
+    cb_blocker_cobrar_date,
+    cb_blocker_data_date,
+    cb_blocker_decidir_ok,
+    cb_blocker_keep,
+    cb_blocker_next_step_ok,
+    cb_blocker_next_step_retry,
+    cb_blocker_recurso_ok,
+    cb_blocker_start,
+    cb_blocker_type,
+    cb_unblock,
+)
 from src.handlers.agora import (
     cb_agora_adiar,
     cb_agora_concluir,
@@ -92,6 +107,21 @@ def main() -> None:
 
     # ConversationHandler de listas (antes do capture handler)
     app.add_handler(list_conversation)
+
+    # Impedimentos
+    app.add_handler(CallbackQueryHandler(cb_blocker_start, pattern=r"^blk_start:"))
+    app.add_handler(CallbackQueryHandler(cb_blocker_type, pattern=r"^blk_t:"))
+    app.add_handler(CallbackQueryHandler(cb_blocker_next_step_ok, pattern=r"^blk_nok:"))
+    app.add_handler(CallbackQueryHandler(cb_blocker_next_step_retry, pattern=r"^blk_nretry:"))
+    app.add_handler(CallbackQueryHandler(cb_blocker_decidir_ok, pattern=r"^blk_dok:"))
+    app.add_handler(CallbackQueryHandler(cb_blocker_recurso_ok, pattern=r"^blk_rook:"))
+    app.add_handler(CallbackQueryHandler(cb_blocker_aguardar, pattern=r"^blk_wait:"))
+    app.add_handler(CallbackQueryHandler(cb_blocker_cobrar, pattern=r"^blk_cobrar:"))
+    app.add_handler(CallbackQueryHandler(cb_blocker_cobrar_date, pattern=r"^blk_cd:"))
+    app.add_handler(CallbackQueryHandler(cb_blocker_data_date, pattern=r"^blk_dd:"))
+    app.add_handler(CallbackQueryHandler(cb_blocker_archive, pattern=r"^blk_arc:"))
+    app.add_handler(CallbackQueryHandler(cb_blocker_keep, pattern=r"^blk_keep:"))
+    app.add_handler(CallbackQueryHandler(cb_unblock, pattern=r"^unblock:"))
 
     # /agora
     app.add_handler(CallbackQueryHandler(cb_agora_tempo, pattern=r"^ag_t:"))
