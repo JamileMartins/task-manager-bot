@@ -1,9 +1,29 @@
 """Testes das mensagens centralizadas (utils/textos.py)."""
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from src.utils import textos
+
+
+def _mock_task(**kwargs):
+    defaults = {
+        "title": "Tarefa teste",
+        "task_list": None,
+        "quadrant": None,
+        "energy": None,
+        "estimate_min": None,
+        "status": "aberta",
+        "blocker_type": None,
+        "blocker_is_external": None,
+        "due_at": None,
+        "recurrence": None,
+        "next_step": None,
+    }
+    defaults.update(kwargs)
+    return SimpleNamespace(**defaults)
 
 
 # ---------------------------------------------------------------------------
@@ -138,6 +158,14 @@ def test_msg_confirmar_arquivar_explica_consequencia():
     "MSG_INBOX_VAZIA",
     "MSG_CANCELADO",
     "MSG_REINICIANDO",
+    "MSG_CLASSIFICANDO",
+    "MSG_AGORA_NADA",
+    "MSG_DIARIO_VAZIO",
+    "MSG_REVISAO_NADA",
+    "MSG_CASAL_VAZIA",
+    "MSG_CASAL_SEM_GRUPO",
+    "MSG_BUSCA_SEM_TERMO",
+    "MSG_BUSCA_VAZIA",
 ])
 def test_constante_nao_vazia(constante):
     valor = getattr(textos, constante)
@@ -146,10 +174,293 @@ def test_constante_nao_vazia(constante):
 
 
 def test_ajuda_menciona_comandos_essenciais():
-    for cmd in ["/agora", "/listas", "/inbox", "/ping", "/reiniciar"]:
+    for cmd in ["/agora", "/listas", "/inbox", "/ping", "/reiniciar", "/casal", "/buscar"]:
         assert cmd in textos.MSG_AJUDA, f"Comando {cmd} ausente em MSG_AJUDA"
 
 
 def test_boas_vindas_menciona_comandos_iniciais():
     for cmd in ["/agora", "/listas", "/ajuda"]:
         assert cmd in textos.MSG_BOAS_VINDAS, f"Comando {cmd} ausente em MSG_BOAS_VINDAS"
+
+
+# ---------------------------------------------------------------------------
+# F2 — msg_classificacao_resumo
+# ---------------------------------------------------------------------------
+
+def test_classificacao_resumo_contem_titulo():
+    tarefas = [{"titulo": "Ligar pro dentista", "lista_sugerida": "Saúde",
+                "quadrante_sugerido": 2, "estimativa_min": 15, "energia": "baixa",
+                "impedimento": None, "impedimento_externo": False, "proximo_passo": None}]
+    resultado = textos.msg_classificacao_resumo(tarefas)
+    assert "Ligar pro dentista" in resultado
+
+
+def test_classificacao_resumo_conta_tarefas_no_header():
+    tarefas = [
+        {"titulo": "T1", "lista_sugerida": None, "quadrante_sugerido": None,
+         "estimativa_min": None, "energia": None, "impedimento": None,
+         "impedimento_externo": False, "proximo_passo": None},
+        {"titulo": "T2", "lista_sugerida": None, "quadrante_sugerido": None,
+         "estimativa_min": None, "energia": None, "impedimento": None,
+         "impedimento_externo": False, "proximo_passo": None},
+    ]
+    resultado = textos.msg_classificacao_resumo(tarefas)
+    assert "2 tarefas" in resultado
+
+
+def test_classificacao_resumo_singular_uma_tarefa():
+    tarefas = [{"titulo": "Única", "lista_sugerida": None, "quadrante_sugerido": None,
+                "estimativa_min": None, "energia": None, "impedimento": None,
+                "impedimento_externo": False, "proximo_passo": None}]
+    resultado = textos.msg_classificacao_resumo(tarefas)
+    assert "1 tarefa" in resultado
+
+
+def test_classificacao_resumo_mostra_lista():
+    tarefas = [{"titulo": "Tarefa", "lista_sugerida": "Trabalho",
+                "quadrante_sugerido": None, "estimativa_min": None, "energia": None,
+                "impedimento": None, "impedimento_externo": False, "proximo_passo": None}]
+    resultado = textos.msg_classificacao_resumo(tarefas)
+    assert "Trabalho" in resultado
+
+
+def test_classificacao_resumo_inbox_quando_sem_lista():
+    tarefas = [{"titulo": "Tarefa", "lista_sugerida": None,
+                "quadrante_sugerido": None, "estimativa_min": None, "energia": None,
+                "impedimento": None, "impedimento_externo": False, "proximo_passo": None}]
+    resultado = textos.msg_classificacao_resumo(tarefas)
+    assert "Inbox" in resultado
+
+
+def test_classificacao_resumo_mostra_indicador_aguardando():
+    tarefas = [{"titulo": "Depende de alguém", "lista_sugerida": None,
+                "quadrante_sugerido": None, "estimativa_min": None, "energia": None,
+                "impedimento": "pessoa", "impedimento_externo": True, "proximo_passo": None}]
+    resultado = textos.msg_classificacao_resumo(tarefas)
+    assert "aguardando" in resultado.lower()
+
+
+def test_classificacao_resumo_mostra_proximo_passo_vaga_grande():
+    tarefas = [{"titulo": "Grande projeto", "lista_sugerida": None,
+                "quadrante_sugerido": None, "estimativa_min": None, "energia": None,
+                "impedimento": "vaga_grande", "impedimento_externo": False,
+                "proximo_passo": "Abrir documento e escrever o título"}]
+    resultado = textos.msg_classificacao_resumo(tarefas)
+    assert "Abrir documento" in resultado
+
+
+# ---------------------------------------------------------------------------
+# F3 — msg_agora_tarefa / msg_agora_adiada
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("days,esperado", [
+    (1, "amanhã"),
+    (3, "3 dias"),
+    (7, "próxima semana"),
+])
+def test_agora_adiada_menciona_prazo(days, esperado):
+    resultado = textos.msg_agora_adiada(days)
+    assert esperado in resultado.lower()
+
+
+def test_agora_tarefa_contem_titulo():
+    task = _mock_task(title="Preparar apresentação")
+    resultado = textos.msg_agora_tarefa(task)
+    assert "Preparar apresentação" in resultado
+
+
+def test_agora_tarefa_mostra_lista():
+    lista = SimpleNamespace(name="Trabalho")
+    task = _mock_task(title="Reunião", task_list=lista)
+    resultado = textos.msg_agora_tarefa(task)
+    assert "Trabalho" in resultado
+
+
+def test_agora_tarefa_fallback_mostra_mensagem_gentil():
+    task = _mock_task(title="Tarefa")
+    resultado = textos.msg_agora_tarefa(task, fallback=True)
+    assert "perfeito" in resultado.lower() or "que tal" in resultado.lower()
+
+
+def test_agora_tarefa_sem_lista_mostra_inbox():
+    task = _mock_task(title="Tarefa", task_list=None)
+    resultado = textos.msg_agora_tarefa(task)
+    assert "Inbox" in resultado
+
+
+# ---------------------------------------------------------------------------
+# F4 — msg_diario_focos / msg_revisao_* / msg_config_status
+# ---------------------------------------------------------------------------
+
+def test_diario_focos_contem_titulos():
+    t1 = SimpleNamespace(title="Reunião", estimate_min=30)
+    t2 = SimpleNamespace(title="Relatório", estimate_min=None)
+    resultado = textos.msg_diario_focos([t1], [t2])
+    assert "Reunião" in resultado
+    assert "Relatório" in resultado
+
+
+def test_diario_focos_mostra_estimativa_quando_presente():
+    t = SimpleNamespace(title="Tarefa", estimate_min=45)
+    resultado = textos.msg_diario_focos([t], [])
+    assert "45min" in resultado
+
+
+def test_diario_focos_sem_estimativa_nao_quebra():
+    t = SimpleNamespace(title="Tarefa", estimate_min=None)
+    resultado = textos.msg_diario_focos([], [t])
+    assert "Tarefa" in resultado
+
+
+def test_revisao_abertura_contem_contagem():
+    resultado = textos.msg_revisao_abertura(5)
+    assert "5" in resultado
+
+
+def test_revisao_abertura_singular():
+    resultado = textos.msg_revisao_abertura(1)
+    assert "1 tarefa" in resultado
+
+
+def test_revisao_tarefa_contem_titulo_e_dias():
+    task = SimpleNamespace(title="Projeto parado")
+    resultado = textos.msg_revisao_tarefa(task, 14)
+    assert "Projeto parado" in resultado
+    assert "14" in resultado
+
+
+def test_revisao_espera_contem_titulo_e_dias():
+    task = SimpleNamespace(title="Aguardando retorno")
+    resultado = textos.msg_revisao_espera(task, 20)
+    assert "Aguardando retorno" in resultado
+    assert "20" in resultado
+
+
+@pytest.mark.parametrize("stats,esperado", [
+    ({"reagendadas": 2}, "reagendou 2"),
+    ({"arquivadas": 1}, "arquivou 1"),
+    ({"destravadas": 3}, "destravou 3"),
+    ({}, "Tudo mantido"),
+])
+def test_revisao_encerramento_menciona_acao(stats, esperado):
+    resultado = textos.msg_revisao_encerramento(stats)
+    assert esperado.lower() in resultado.lower()
+
+
+def test_config_status_desativado_sem_config():
+    resultado = textos.msg_config_status(None)
+    assert "desativado" in resultado
+    assert "desativada" in resultado
+
+
+def test_config_status_mostra_horario_diario():
+    from datetime import time
+    cfg = SimpleNamespace(
+        daily_summary_time=time(7, 30),
+        weekly_review_dow=None,
+        weekly_review_time=None,
+        couple_group_chat_id=None,
+    )
+    resultado = textos.msg_config_status(cfg)
+    assert "07:30" in resultado
+
+
+def test_config_status_mostra_dia_revisao():
+    from datetime import time
+    cfg = SimpleNamespace(
+        daily_summary_time=None,
+        weekly_review_dow=4,  # sexta
+        weekly_review_time=time(19, 0),
+        couple_group_chat_id=None,
+    )
+    resultado = textos.msg_config_status(cfg)
+    assert "sexta" in resultado.lower()
+    assert "19:00" in resultado
+
+
+def test_config_status_mostra_grupo_configurado():
+    cfg = SimpleNamespace(
+        daily_summary_time=None,
+        weekly_review_dow=None,
+        weekly_review_time=None,
+        couple_group_chat_id=-100123456,
+    )
+    resultado = textos.msg_config_status(cfg)
+    assert "configurado" in resultado.lower()
+
+
+def test_config_status_mostra_grupo_nao_configurado():
+    cfg = SimpleNamespace(
+        daily_summary_time=None,
+        weekly_review_dow=None,
+        weekly_review_time=None,
+        couple_group_chat_id=None,
+    )
+    resultado = textos.msg_config_status(cfg)
+    assert "não configurado" in resultado.lower()
+
+
+# ---------------------------------------------------------------------------
+# F5 — msg_casal / msg_busca
+# ---------------------------------------------------------------------------
+
+def test_msg_casal_contem_titulos():
+    t1 = _mock_task(title="Comprar pão")
+    t2 = _mock_task(title="Pagar aluguel")
+    resultado = textos.msg_casal([t1, t2])
+    assert "Comprar pão" in resultado
+    assert "Pagar aluguel" in resultado
+
+
+def test_msg_casal_contem_contagem():
+    tasks = [_mock_task(title=f"T{i}") for i in range(3)]
+    resultado = textos.msg_casal(tasks)
+    assert "3 tarefas" in resultado
+
+
+def test_msg_casal_singular():
+    resultado = textos.msg_casal([_mock_task(title="Única")])
+    assert "1 tarefa" in resultado
+
+
+def test_msg_casal_mostra_estimativa():
+    task = _mock_task(title="Comprar legumes", estimate_min=20)
+    resultado = textos.msg_casal([task])
+    assert "20min" in resultado
+
+
+def test_msg_busca_contem_titulo_e_termo():
+    t = _mock_task(title="Reunião mensal")
+    resultado = textos.msg_busca([t], "reunião")
+    assert "Reunião mensal" in resultado
+    assert "reunião" in resultado
+
+
+def test_msg_busca_contem_contagem():
+    tasks = [_mock_task(title=f"T{i}") for i in range(2)]
+    resultado = textos.msg_busca(tasks, "algo")
+    assert "2 tarefas" in resultado
+
+
+def test_msg_busca_singular():
+    resultado = textos.msg_busca([_mock_task(title="Única")], "única")
+    assert "1 tarefa" in resultado
+
+
+def test_msg_busca_mostra_lista_da_tarefa():
+    lista = SimpleNamespace(name="Trabalho")
+    task = _mock_task(title="Preparar doc", task_list=lista)
+    resultado = textos.msg_busca([task], "doc")
+    assert "Trabalho" in resultado
+
+
+def test_msg_busca_inbox_quando_sem_lista():
+    task = _mock_task(title="Tarefa", task_list=None)
+    resultado = textos.msg_busca([task], "tarefa")
+    assert "Inbox" in resultado
+
+
+def test_msg_busca_aguardando_mostra_icone():
+    task = _mock_task(title="Aguardando", status="aguardando", task_list=None)
+    resultado = textos.msg_busca([task], "aguardando")
+    assert "⏳" in resultado

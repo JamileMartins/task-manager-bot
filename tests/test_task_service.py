@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
 from sqlalchemy import select
 
-from src.db.models import Config, Task, TaskList, User
+from src.db.models import Config, Reminder, Task, TaskList, User
 from src.services import task_service
 
 
@@ -994,3 +994,703 @@ def test_reorder_nao_cruza_lista_diferente(svc):
     assert result is False
     svc.refresh(t_b)
     assert t_b.sort_order == 1
+
+
+# ---------------------------------------------------------------------------
+# F2 — save_classified_tasks
+# ---------------------------------------------------------------------------
+
+def test_save_classified_tasks_cria_tarefas(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+
+    tarefas = [{"titulo": "Ligar pro cliente", "lista_sugerida": "Trabalho",
+                "quadrante_sugerido": 2, "estimativa_min": 10, "energia": "media",
+                "impedimento": None, "impedimento_externo": False, "proximo_passo": None,
+                "prazo_sugerido": None}]
+
+    salvas = task_service.save_classified_tasks(user.telegram_chat_id, tarefas)
+
+    assert len(salvas) == 1
+    assert salvas[0].title == "Ligar pro cliente"
+    assert salvas[0].status == "aberta"
+
+
+def test_save_classified_tasks_externo_vira_aguardando(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+
+    tarefas = [{"titulo": "Aguardar retorno", "lista_sugerida": "Trabalho",
+                "quadrante_sugerido": None, "estimativa_min": None, "energia": "media",
+                "impedimento": "pessoa", "impedimento_externo": True, "proximo_passo": None,
+                "prazo_sugerido": None}]
+
+    salvas = task_service.save_classified_tasks(user.telegram_chat_id, tarefas)
+
+    assert salvas[0].status == "aguardando"
+    assert salvas[0].waiting_since is not None
+
+
+def test_save_classified_tasks_lista_inexistente_vai_para_inbox(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+
+    tarefas = [{"titulo": "Sem lista", "lista_sugerida": "Lista Fantasma",
+                "quadrante_sugerido": None, "estimativa_min": None, "energia": None,
+                "impedimento": None, "impedimento_externo": False, "proximo_passo": None,
+                "prazo_sugerido": None}]
+
+    salvas = task_service.save_classified_tasks(user.telegram_chat_id, tarefas)
+
+    assert salvas[0].list_id is None
+
+
+# ---------------------------------------------------------------------------
+# F4 — archive_task
+# ---------------------------------------------------------------------------
+
+def test_archive_task_muda_status_para_arquivada(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+
+    assert task_service.archive_task(t.id) is True
+    svc.refresh(t)
+    assert t.status == "arquivada"
+
+
+def test_archive_task_aceita_string_uuid(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+
+    assert task_service.archive_task(str(t.id)) is True
+
+
+def test_archive_task_inexistente_retorna_false(svc):
+    assert task_service.archive_task(uuid.uuid4()) is False
+
+
+# ---------------------------------------------------------------------------
+# F4 — reschedule_task
+# ---------------------------------------------------------------------------
+
+def test_reschedule_task_define_due_at_futuro(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+    antes = datetime.now(timezone.utc)
+
+    task_service.reschedule_task(t.id, 7)
+    svc.refresh(t)
+
+    due = t.due_at.replace(tzinfo=timezone.utc) if t.due_at.tzinfo is None else t.due_at
+    assert due > antes
+
+
+def test_reschedule_task_atualiza_last_touched_at(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+    before = t.last_touched_at
+
+    task_service.reschedule_task(t.id, 1)
+    svc.refresh(t)
+
+    after = t.last_touched_at.replace(tzinfo=timezone.utc) if t.last_touched_at.tzinfo is None else t.last_touched_at
+    before_utc = before.replace(tzinfo=timezone.utc) if before.tzinfo is None else before
+    assert after >= before_utc
+
+
+def test_reschedule_task_inexistente_retorna_none(svc):
+    assert task_service.reschedule_task(uuid.uuid4(), 3) is None
+
+
+# ---------------------------------------------------------------------------
+# F4 — set_blocker / set_waiting / unblock_task
+# ---------------------------------------------------------------------------
+
+def test_set_blocker_salva_tipo_interno(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+
+    task_service.set_blocker(t.id, "vaga_grande")
+    svc.refresh(t)
+
+    assert t.blocker_type == "vaga_grande"
+    assert t.blocker_is_external is False
+
+
+@pytest.mark.parametrize("tipo", ["pessoa", "recurso_info", "data_externa"])
+def test_set_blocker_tipos_externos_inferem_flag(svc, tipo):
+    user = _user(svc)
+    t = _task(svc, user)
+
+    task_service.set_blocker(t.id, tipo)
+    svc.refresh(t)
+
+    assert t.blocker_is_external is True
+
+
+@pytest.mark.parametrize("tipo", ["vaga_grande", "decisao_pendente", "aversiva_energia", "obsoleta"])
+def test_set_blocker_tipos_internos_flag_false(svc, tipo):
+    user = _user(svc)
+    t = _task(svc, user)
+
+    task_service.set_blocker(t.id, tipo)
+    svc.refresh(t)
+
+    assert t.blocker_is_external is False
+
+
+def test_set_waiting_muda_status_e_registra_waiting_since(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+    antes = datetime.now(timezone.utc)
+
+    task_service.set_waiting(t.id)
+    svc.refresh(t)
+
+    assert t.status == "aguardando"
+    ws = t.waiting_since.replace(tzinfo=timezone.utc) if t.waiting_since.tzinfo is None else t.waiting_since
+    assert ws >= antes
+
+
+def test_set_waiting_com_due_at_define_prazo(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+    prazo = datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc)
+
+    task_service.set_waiting(t.id, due_at=prazo)
+    svc.refresh(t)
+
+    assert t.status == "aguardando"
+    assert t.due_at is not None
+
+
+def test_unblock_task_volta_para_aberta_e_limpa_campos(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+    t.status = "aguardando"
+    t.waiting_since = datetime.now(timezone.utc)
+    t.blocker_type = "pessoa"
+    t.blocker_is_external = True
+    svc.flush()
+
+    task_service.unblock_task(t.id)
+    svc.refresh(t)
+
+    assert t.status == "aberta"
+    assert t.waiting_since is None
+    assert t.blocker_type is None
+    assert t.blocker_is_external is None
+
+
+def test_unblock_task_inexistente_retorna_none(svc):
+    assert task_service.unblock_task(uuid.uuid4()) is None
+
+
+# ---------------------------------------------------------------------------
+# F4 — get_stale_tasks / get_stale_waiting_tasks
+# ---------------------------------------------------------------------------
+
+def test_get_stale_tasks_retorna_antigas_e_ignora_recentes(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+    cfg = svc.scalar(select(Config).where(Config.user_id == user.id))
+    cfg.stale_days = 7
+    svc.flush()
+
+    t_velha = _task(svc, user, title="Velha")
+    t_velha.last_touched_at = datetime.now(timezone.utc) - timedelta(days=10)
+    t_recente = _task(svc, user, title="Recente")
+    svc.flush()
+
+    stale = task_service.get_stale_tasks(user.telegram_chat_id)
+
+    ids = [t.id for t in stale]
+    assert t_velha.id in ids
+    assert t_recente.id not in ids
+
+
+def test_get_stale_tasks_ignora_nao_abertas(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+    cfg = svc.scalar(select(Config).where(Config.user_id == user.id))
+    cfg.stale_days = 7
+    svc.flush()
+
+    old = datetime.now(timezone.utc) - timedelta(days=15)
+    t_c = _task(svc, user, title="Concluída", status="concluida")
+    t_c.last_touched_at = old
+    t_w = _task(svc, user, title="Aguardando", status="aguardando")
+    t_w.last_touched_at = old
+    svc.flush()
+
+    stale = task_service.get_stale_tasks(user.telegram_chat_id)
+
+    titles = [t.title for t in stale]
+    assert "Concluída" not in titles
+    assert "Aguardando" not in titles
+
+
+def test_get_stale_waiting_retorna_esperas_longas(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+    cfg = svc.scalar(select(Config).where(Config.user_id == user.id))
+    cfg.stale_waiting_days = 14
+    svc.flush()
+
+    t_longa = _task(svc, user, title="Espera Longa", status="aguardando")
+    t_longa.waiting_since = datetime.now(timezone.utc) - timedelta(days=20)
+    t_recente = _task(svc, user, title="Espera Recente", status="aguardando")
+    t_recente.waiting_since = datetime.now(timezone.utc) - timedelta(days=5)
+    svc.flush()
+
+    stale = task_service.get_stale_waiting_tasks(user.telegram_chat_id)
+
+    ids = [t.id for t in stale]
+    assert t_longa.id in ids
+    assert t_recente.id not in ids
+
+
+def test_get_stale_waiting_ignora_tarefas_abertas(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+    cfg = svc.scalar(select(Config).where(Config.user_id == user.id))
+    cfg.stale_waiting_days = 7
+    svc.flush()
+
+    t_aberta = _task(svc, user, title="Aberta Velha", status="aberta")
+    t_aberta.last_touched_at = datetime.now(timezone.utc) - timedelta(days=30)
+    svc.flush()
+
+    stale = task_service.get_stale_waiting_tasks(user.telegram_chat_id)
+
+    assert not any(t.title == "Aberta Velha" for t in stale)
+
+
+# ---------------------------------------------------------------------------
+# F4 — get_config / update_config (US-20)
+# ---------------------------------------------------------------------------
+
+def test_get_config_retorna_none_sem_usuario(svc):
+    assert task_service.get_config(chat_id=999888) is None
+
+
+def test_get_config_retorna_defaults(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+
+    cfg = task_service.get_config(user.telegram_chat_id)
+
+    assert cfg is not None
+    assert cfg.stale_days == 7
+    assert cfg.stale_waiting_days == 14
+    assert cfg.daily_summary_time is None
+    assert cfg.couple_group_chat_id is None
+
+
+def test_update_config_salva_horario_diario(svc):
+    from datetime import time as dtime
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+
+    task_service.update_config(user.telegram_chat_id, daily_summary_time=dtime(7, 30))
+    cfg = task_service.get_config(user.telegram_chat_id)
+
+    assert cfg.daily_summary_time.hour == 7
+    assert cfg.daily_summary_time.minute == 30
+
+
+def test_update_config_salva_grupo_casal(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+
+    task_service.update_config(user.telegram_chat_id, couple_group_chat_id=-100123456)
+    cfg = task_service.get_config(user.telegram_chat_id)
+
+    assert cfg.couple_group_chat_id == -100123456
+
+
+def test_update_config_ignora_campo_nao_permitido(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+
+    task_service.update_config(user.telegram_chat_id, campo_inventado=999)
+    cfg = task_service.get_config(user.telegram_chat_id)
+
+    assert cfg.stale_days == 7  # não alterado
+
+
+# ---------------------------------------------------------------------------
+# F4 — recorrência (US-18)
+# ---------------------------------------------------------------------------
+
+def test_complete_task_com_recorrencia_cria_proxima_ocorrencia(svc):
+    user = _user(svc)
+    prazo = datetime(2026, 6, 1, 9, 0, tzinfo=timezone.utc)
+    t = _task_f3(svc, user, title="Tarefa Semanal", due_at=prazo)
+    t.recurrence = "weekly"
+    svc.flush()
+
+    task_service.complete_task(t.id)
+
+    todas = svc.scalars(select(Task).where(Task.user_id == user.id)).all()
+    concluidas = [x for x in todas if x.status == "concluida"]
+    abertas = [x for x in todas if x.status == "aberta"]
+    assert len(concluidas) == 1
+    assert len(abertas) == 1
+
+
+def test_complete_task_recorrencia_diaria_due_at_correto(svc):
+    user = _user(svc)
+    prazo = datetime(2026, 6, 1, 9, 0, tzinfo=timezone.utc)
+    t = _task_f3(svc, user, title="Diária", due_at=prazo)
+    t.recurrence = "daily"
+    svc.flush()
+
+    task_service.complete_task(t.id)
+
+    proxima = svc.scalar(
+        select(Task).where(Task.user_id == user.id, Task.status == "aberta")
+    )
+    assert proxima is not None
+    due = proxima.due_at.replace(tzinfo=timezone.utc) if proxima.due_at.tzinfo is None else proxima.due_at
+    assert due == prazo + timedelta(days=1)
+
+
+def test_complete_task_recorrencia_mensal_avanca_30_dias(svc):
+    user = _user(svc)
+    prazo = datetime(2026, 6, 1, 9, 0, tzinfo=timezone.utc)
+    t = _task_f3(svc, user, title="Mensal", due_at=prazo)
+    t.recurrence = "monthly"
+    svc.flush()
+
+    task_service.complete_task(t.id)
+
+    proxima = svc.scalar(
+        select(Task).where(Task.user_id == user.id, Task.status == "aberta")
+    )
+    assert proxima is not None
+    due = proxima.due_at.replace(tzinfo=timezone.utc) if proxima.due_at.tzinfo is None else proxima.due_at
+    assert due == prazo + timedelta(days=30)
+
+
+def test_complete_task_sem_recorrencia_nao_cria_proxima(svc):
+    user = _user(svc)
+    t = _task(svc, user, title="Única")
+
+    task_service.complete_task(t.id)
+
+    todas = svc.scalars(select(Task).where(Task.user_id == user.id)).all()
+    assert len(todas) == 1
+    assert todas[0].status == "concluida"
+
+
+def test_complete_task_recorrencia_preserva_atributos(svc):
+    user = _user(svc)
+    lst = _list(svc, user)
+    prazo = datetime(2026, 6, 1, 9, 0, tzinfo=timezone.utc)
+    t = _task_f3(svc, user, title="Com Atributos", list_id=lst.id, quadrant=2,
+                 energy="alta", estimate_min=30, due_at=prazo)
+    t.recurrence = "weekly"
+    svc.flush()
+
+    task_service.complete_task(t.id)
+
+    proxima = svc.scalar(
+        select(Task).where(Task.user_id == user.id, Task.status == "aberta")
+    )
+    assert proxima.quadrant == 2
+    assert proxima.energy == "alta"
+    assert proxima.estimate_min == 30
+    assert proxima.list_id == lst.id
+    assert proxima.recurrence == "weekly"
+
+
+# ---------------------------------------------------------------------------
+# F4 — lembretes: _sync_reminder / get_due_reminders / mark_reminder_sent (US-17)
+# ---------------------------------------------------------------------------
+
+def test_update_due_at_cria_lembrete(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+    prazo = datetime(2099, 12, 1, 10, 0, tzinfo=timezone.utc)
+
+    task_service.update_task_attrs(t.id, due_at=prazo)
+
+    lembrete = svc.scalar(select(Reminder).where(Reminder.task_id == t.id))
+    assert lembrete is not None
+    assert lembrete.sent is False
+
+
+def test_update_due_at_none_remove_lembrete(svc):
+    user = _user(svc)
+    prazo = datetime(2099, 12, 1, 10, 0, tzinfo=timezone.utc)
+    t = _task_f3(svc, user, due_at=prazo)
+    svc.add(Reminder(task_id=t.id, remind_at=prazo))
+    svc.flush()
+
+    task_service.update_task_attrs(t.id, due_at=None)
+
+    lembrete = svc.scalar(
+        select(Reminder).where(Reminder.task_id == t.id, Reminder.sent.is_(False))
+    )
+    assert lembrete is None
+
+
+def test_update_due_at_atualiza_lembrete_existente(svc):
+    user = _user(svc)
+    prazo1 = datetime(2099, 6, 1, tzinfo=timezone.utc)
+    prazo2 = datetime(2099, 7, 1, tzinfo=timezone.utc)
+    t = _task_f3(svc, user, due_at=prazo1)
+    svc.add(Reminder(task_id=t.id, remind_at=prazo1))
+    svc.flush()
+
+    task_service.update_task_attrs(t.id, due_at=prazo2)
+
+    lembretes = svc.scalars(
+        select(Reminder).where(Reminder.task_id == t.id, Reminder.sent.is_(False))
+    ).all()
+    assert len(lembretes) == 1
+    remind = lembretes[0].remind_at
+    remind = remind.replace(tzinfo=timezone.utc) if remind.tzinfo is None else remind
+    assert remind == prazo2
+
+
+def test_get_due_reminders_retorna_vencidos(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+    passado = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    r = Reminder(task_id=t.id, remind_at=passado)
+    svc.add(r)
+    svc.flush()
+
+    due = task_service.get_due_reminders()
+
+    assert any(lem.id == r.id for lem, _, _ in due)
+
+
+def test_get_due_reminders_nao_retorna_futuros(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+    futuro = datetime(2099, 12, 31, tzinfo=timezone.utc)
+    r = Reminder(task_id=t.id, remind_at=futuro)
+    svc.add(r)
+    svc.flush()
+
+    due = task_service.get_due_reminders()
+
+    assert not any(lem.id == r.id for lem, _, _ in due)
+
+
+def test_get_due_reminders_nao_retorna_ja_enviados(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+    passado = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    r = Reminder(task_id=t.id, remind_at=passado, sent=True)
+    svc.add(r)
+    svc.flush()
+
+    due = task_service.get_due_reminders()
+
+    assert not any(lem.id == r.id for lem, _, _ in due)
+
+
+def test_get_due_reminders_inclui_chat_id_correto(svc):
+    user = _user(svc, chat_id=77777)
+    t = _task(svc, user)
+    passado = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    r = Reminder(task_id=t.id, remind_at=passado)
+    svc.add(r)
+    svc.flush()
+
+    due = task_service.get_due_reminders()
+
+    match = next((entry for entry in due if entry[0].id == r.id), None)
+    assert match is not None
+    assert match[2] == 77777
+
+
+def test_mark_reminder_sent_marca_enviado(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+    r = Reminder(task_id=t.id, remind_at=datetime(2020, 1, 1, tzinfo=timezone.utc))
+    svc.add(r)
+    svc.flush()
+
+    task_service.mark_reminder_sent(r.id)
+    svc.refresh(r)
+
+    assert r.sent is True
+
+
+# ---------------------------------------------------------------------------
+# F5 — get_couple_tasks (US-19)
+# ---------------------------------------------------------------------------
+
+def test_get_couple_tasks_retorna_tarefas_da_lista_casal(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+    casal = svc.scalar(
+        select(TaskList).where(TaskList.user_id == user.id, TaskList.is_couple.is_(True))
+    )
+    _task(svc, user, title="Comprar pão", list_id=casal.id)
+    _task(svc, user, title="Pagar aluguel", list_id=casal.id)
+    _task(svc, user, title="Na inbox")
+
+    tasks, group_id = task_service.get_couple_tasks(user.telegram_chat_id)
+
+    assert len(tasks) == 2
+    assert all(t.list_id == casal.id for t in tasks)
+    assert group_id is None
+
+
+def test_get_couple_tasks_retorna_group_id_configurado(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+    task_service.update_config(user.telegram_chat_id, couple_group_chat_id=-100999)
+
+    _, group_id = task_service.get_couple_tasks(user.telegram_chat_id)
+
+    assert group_id == -100999
+
+
+def test_get_couple_tasks_ignora_concluidas(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+    casal = svc.scalar(
+        select(TaskList).where(TaskList.user_id == user.id, TaskList.is_couple.is_(True))
+    )
+    _task(svc, user, title="Aberta", list_id=casal.id)
+    _task(svc, user, title="Concluída", list_id=casal.id, status="concluida")
+
+    tasks, _ = task_service.get_couple_tasks(user.telegram_chat_id)
+
+    assert len(tasks) == 1
+    assert tasks[0].title == "Aberta"
+
+
+def test_get_couple_tasks_lista_vazia_retorna_lista_vazia(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+
+    tasks, _ = task_service.get_couple_tasks(user.telegram_chat_id)
+
+    assert tasks == []
+
+
+def test_get_couple_tasks_usuario_inexistente(svc):
+    tasks, group_id = task_service.get_couple_tasks(999888)
+
+    assert tasks == []
+    assert group_id is None
+
+
+# ---------------------------------------------------------------------------
+# F5 — search_tasks (US-22)
+# ---------------------------------------------------------------------------
+
+def test_search_tasks_encontra_por_titulo(svc):
+    user = _user(svc)
+    t = _task(svc, user, title="Reuniao de planejamento")
+    _task(svc, user, title="Comprar cafe")
+
+    resultado = task_service.search_tasks(user.telegram_chat_id, "reuniao")
+
+    assert len(resultado) == 1
+    assert resultado[0].id == t.id
+
+
+def test_search_tasks_parcial_no_titulo(svc):
+    user = _user(svc)
+    t = _task(svc, user, title="Preparar apresentacao do projeto")
+
+    resultado = task_service.search_tasks(user.telegram_chat_id, "apresentacao")
+
+    assert len(resultado) == 1
+    assert resultado[0].id == t.id
+
+
+def test_search_tasks_nao_retorna_concluidas(svc):
+    user = _user(svc)
+    _task(svc, user, title="Fazer relatorio", status="concluida")
+
+    resultado = task_service.search_tasks(user.telegram_chat_id, "relatorio")
+
+    assert resultado == []
+
+
+def test_search_tasks_nao_retorna_arquivadas(svc):
+    user = _user(svc)
+    _task(svc, user, title="Fazer relatorio", status="arquivada")
+
+    resultado = task_service.search_tasks(user.telegram_chat_id, "relatorio")
+
+    assert resultado == []
+
+
+def test_search_tasks_retorna_aguardando(svc):
+    user = _user(svc)
+    t = _task(svc, user, title="Aguardando aprovacao", status="aguardando")
+
+    resultado = task_service.search_tasks(user.telegram_chat_id, "aprovacao")
+
+    assert len(resultado) == 1
+    assert resultado[0].id == t.id
+
+
+def test_search_tasks_sem_resultado_retorna_lista_vazia(svc):
+    user = _user(svc)
+    _task(svc, user, title="Outra coisa")
+
+    resultado = task_service.search_tasks(user.telegram_chat_id, "inexistente")
+
+    assert resultado == []
+
+
+def test_search_tasks_usuario_inexistente_retorna_lista_vazia(svc):
+    assert task_service.search_tasks(999888, "qualquer") == []
+
+
+def test_search_tasks_respeita_limite_20(svc):
+    user = _user(svc)
+    for i in range(25):
+        _task(svc, user, title=f"Tarefa reuniao {i}")
+
+    resultado = task_service.search_tasks(user.telegram_chat_id, "reuniao")
+
+    assert len(resultado) <= 20
+
+
+def test_search_tasks_encontra_por_notas(svc):
+    user = _user(svc)
+    now = datetime.now(timezone.utc)
+    t = Task(
+        user_id=user.id,
+        title="Tarefa generica",
+        notes="Detalhe importante sobre o projeto",
+        status="aberta",
+        sort_order=0,
+        created_at=now,
+        last_touched_at=now,
+    )
+    svc.add(t)
+    svc.flush()
+
+    resultado = task_service.search_tasks(user.telegram_chat_id, "projeto")
+
+    assert len(resultado) == 1
+    assert resultado[0].id == t.id
