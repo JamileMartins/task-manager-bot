@@ -600,3 +600,397 @@ def test_complete_task_sets_last_touched_at(svc):
     after = task.last_touched_at.replace(tzinfo=timezone.utc) if task.last_touched_at.tzinfo is None else task.last_touched_at
     before_utc = before.replace(tzinfo=timezone.utc) if before.tzinfo is None else before
     assert after >= before_utc
+
+
+# ---------------------------------------------------------------------------
+# Helper F3 — tarefa com atributos de priorização
+# ---------------------------------------------------------------------------
+
+def _task_f3(
+    session,
+    user: User,
+    *,
+    title: str = "Tarefa",
+    status: str = "aberta",
+    estimate_min: int | None = None,
+    energy: str | None = None,
+    quadrant: int | None = None,
+    due_at: datetime | None = None,
+    sort_order: int = 0,
+    list_id=None,
+) -> Task:
+    now = datetime.now(timezone.utc)
+    t = Task(
+        user_id=user.id,
+        list_id=list_id,
+        title=title,
+        status=status,
+        estimate_min=estimate_min,
+        energy=energy,
+        quadrant=quadrant,
+        due_at=due_at,
+        sort_order=sort_order,
+        created_at=now,
+        last_touched_at=now,
+    )
+    session.add(t)
+    session.flush()
+    return t
+
+
+# ---------------------------------------------------------------------------
+# F3 — get_task_for_agora (US-12)
+# ---------------------------------------------------------------------------
+
+def test_agora_retorna_tarefa_compativel(svc):
+    user = _user(svc)
+    t = _task_f3(svc, user, title="Revisar e-mails", estimate_min=15, energy="baixa")
+
+    result = task_service.get_task_for_agora(user.telegram_chat_id, tempo_min=30, energia="media")
+
+    assert result is not None
+    assert result.id == t.id
+
+
+def test_agora_filtra_tarefa_que_excede_tempo(svc):
+    user = _user(svc)
+    _task_f3(svc, user, title="Longa", estimate_min=60, energy="baixa")
+
+    result = task_service.get_task_for_agora(user.telegram_chat_id, tempo_min=15, energia="alta")
+
+    assert result is None
+
+
+def test_agora_aceita_tarefa_sem_estimate(svc):
+    """Tarefa sem estimate_min deve aparecer para qualquer tempo disponível."""
+    user = _user(svc)
+    t = _task_f3(svc, user, title="Sem estimativa", energy="baixa")
+
+    result = task_service.get_task_for_agora(user.telegram_chat_id, tempo_min=5, energia="alta")
+
+    assert result is not None
+    assert result.id == t.id
+
+
+def test_agora_nao_sugere_energia_alta_para_baixa(svc):
+    user = _user(svc)
+    _task_f3(svc, user, title="Pesada", estimate_min=10, energy="alta")
+
+    result = task_service.get_task_for_agora(user.telegram_chat_id, tempo_min=60, energia="baixa")
+
+    assert result is None
+
+
+def test_agora_aceita_energia_baixa_para_media(svc):
+    user = _user(svc)
+    t = _task_f3(svc, user, title="Leve", estimate_min=10, energy="baixa")
+
+    result = task_service.get_task_for_agora(user.telegram_chat_id, tempo_min=30, energia="media")
+
+    assert result is not None
+    assert result.id == t.id
+
+
+def test_agora_aceita_tarefa_sem_energia_definida(svc):
+    """Tarefa sem energy definida deve aparecer para qualquer nível de energia."""
+    user = _user(svc)
+    t = _task_f3(svc, user, title="Neutra", estimate_min=10)
+
+    result = task_service.get_task_for_agora(user.telegram_chat_id, tempo_min=30, energia="baixa")
+
+    assert result is not None
+    assert result.id == t.id
+
+
+def test_agora_respeita_excluidos(svc):
+    user = _user(svc)
+    t1 = _task_f3(svc, user, title="Primeira", estimate_min=10, energy="baixa", sort_order=0)
+    t2 = _task_f3(svc, user, title="Segunda", estimate_min=10, energy="baixa", sort_order=1)
+
+    result = task_service.get_task_for_agora(
+        user.telegram_chat_id, tempo_min=30, energia="alta", excluir_ids=[t1.id]
+    )
+
+    assert result is not None
+    assert result.id == t2.id
+
+
+def test_agora_prefere_quadrante_menor(svc):
+    user = _user(svc)
+    t4 = _task_f3(svc, user, title="Q4", estimate_min=10, energy="baixa", quadrant=4, sort_order=0)
+    t1 = _task_f3(svc, user, title="Q1", estimate_min=10, energy="baixa", quadrant=1, sort_order=1)
+
+    result = task_service.get_task_for_agora(user.telegram_chat_id, tempo_min=30, energia="alta")
+
+    assert result is not None
+    assert result.id == t1.id
+
+
+def test_agora_ignora_tarefas_concluidas(svc):
+    user = _user(svc)
+    _task_f3(svc, user, title="Concluída", estimate_min=5, energy="baixa", status="concluida")
+
+    result = task_service.get_task_for_agora(user.telegram_chat_id, tempo_min=30, energia="alta")
+
+    assert result is None
+
+
+def test_agora_ignora_tarefas_aguardando(svc):
+    user = _user(svc)
+    _task_f3(svc, user, title="Bloqueada", estimate_min=5, energy="baixa", status="aguardando")
+
+    result = task_service.get_task_for_agora(user.telegram_chat_id, tempo_min=30, energia="alta")
+
+    assert result is None
+
+
+def test_agora_sem_candidatos_retorna_none(svc):
+    user = _user(svc)
+
+    result = task_service.get_task_for_agora(user.telegram_chat_id, tempo_min=30, energia="media")
+
+    assert result is None
+
+
+def test_agora_usuario_inexistente_retorna_none(svc):
+    result = task_service.get_task_for_agora(chat_id=999777, tempo_min=30, energia="media")
+
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# F3 — get_lightest_task (US-12 fallback)
+# ---------------------------------------------------------------------------
+
+def test_lightest_retorna_tarefa_mais_leve(svc):
+    user = _user(svc)
+    _task_f3(svc, user, title="Pesada", estimate_min=60)
+    t_leve = _task_f3(svc, user, title="Leve", estimate_min=5)
+
+    result = task_service.get_lightest_task(user.telegram_chat_id)
+
+    assert result is not None
+    assert result.id == t_leve.id
+
+
+def test_lightest_respeita_excluidos(svc):
+    user = _user(svc)
+    t1 = _task_f3(svc, user, title="Leve", estimate_min=5)
+    t2 = _task_f3(svc, user, title="Media", estimate_min=30)
+
+    result = task_service.get_lightest_task(user.telegram_chat_id, excluir_ids=[t1.id])
+
+    assert result is not None
+    assert result.id == t2.id
+
+
+def test_lightest_todas_excluidas_retorna_none(svc):
+    user = _user(svc)
+    t = _task_f3(svc, user, title="Única", estimate_min=5)
+
+    result = task_service.get_lightest_task(user.telegram_chat_id, excluir_ids=[t.id])
+
+    assert result is None
+
+
+def test_lightest_sem_tarefas_retorna_none(svc):
+    user = _user(svc)
+
+    result = task_service.get_lightest_task(user.telegram_chat_id)
+
+    assert result is None
+
+
+def test_lightest_prefere_sem_estimate_por_ultimo(svc):
+    """Tarefa com estimate_min=None aparece depois das que têm valor."""
+    user = _user(svc)
+    t_none = _task_f3(svc, user, title="Sem estimativa", sort_order=0)
+    t5 = _task_f3(svc, user, title="5 min", estimate_min=5, sort_order=1)
+
+    result = task_service.get_lightest_task(user.telegram_chat_id)
+
+    assert result is not None
+    assert result.id == t5.id
+
+
+# ---------------------------------------------------------------------------
+# F3 — update_task_attrs (US-07, 08, 09, 10)
+# ---------------------------------------------------------------------------
+
+def test_update_task_quadrant(svc):
+    user = _user(svc)
+    t = _task_f3(svc, user)
+
+    task_service.update_task_attrs(t.id, quadrant=2)
+    svc.refresh(t)
+
+    assert t.quadrant == 2
+
+
+def test_update_task_energy(svc):
+    user = _user(svc)
+    t = _task_f3(svc, user)
+
+    task_service.update_task_attrs(t.id, energy="baixa")
+    svc.refresh(t)
+
+    assert t.energy == "baixa"
+
+
+def test_update_task_estimate_min(svc):
+    user = _user(svc)
+    t = _task_f3(svc, user)
+
+    task_service.update_task_attrs(t.id, estimate_min=30)
+    svc.refresh(t)
+
+    assert t.estimate_min == 30
+
+
+def test_update_task_due_at(svc):
+    user = _user(svc)
+    t = _task_f3(svc, user)
+    prazo = datetime(2026, 12, 31, 23, 59, tzinfo=timezone.utc)
+
+    task_service.update_task_attrs(t.id, due_at=prazo)
+    svc.refresh(t)
+
+    assert t.due_at is not None
+
+
+def test_update_task_due_at_none_remove_prazo(svc):
+    user = _user(svc)
+    prazo = datetime(2026, 12, 31, tzinfo=timezone.utc)
+    t = _task_f3(svc, user, due_at=prazo)
+
+    task_service.update_task_attrs(t.id, due_at=None)
+    svc.refresh(t)
+
+    assert t.due_at is None
+
+
+def test_update_task_list_id_move_para_lista(svc):
+    user = _user(svc)
+    lst = _list(svc, user, name="Trabalho")
+    t = _task_f3(svc, user)
+
+    task_service.update_task_attrs(t.id, list_id=lst.id)
+    svc.refresh(t)
+
+    assert t.list_id == lst.id
+
+
+def test_update_task_list_id_none_move_para_inbox(svc):
+    user = _user(svc)
+    lst = _list(svc, user)
+    t = _task_f3(svc, user, list_id=lst.id)
+
+    task_service.update_task_attrs(t.id, list_id=None)
+    svc.refresh(t)
+
+    assert t.list_id is None
+
+
+def test_update_task_atualiza_last_touched_at(svc):
+    user = _user(svc)
+    t = _task_f3(svc, user)
+    before = t.last_touched_at
+
+    task_service.update_task_attrs(t.id, quadrant=3)
+    svc.refresh(t)
+
+    after = t.last_touched_at.replace(tzinfo=timezone.utc) if t.last_touched_at.tzinfo is None else t.last_touched_at
+    before_utc = before.replace(tzinfo=timezone.utc) if before.tzinfo is None else before
+    assert after >= before_utc
+
+
+def test_update_task_inexistente_retorna_none(svc):
+    result = task_service.update_task_attrs(uuid.uuid4(), quadrant=1)
+
+    assert result is None
+
+
+def test_update_task_ignora_campo_nao_permitido(svc):
+    user = _user(svc)
+    t = _task_f3(svc, user, title="Original")
+
+    task_service.update_task_attrs(t.id, title="Alterado", quadrant=1)
+    svc.refresh(t)
+
+    assert t.title == "Original"
+    assert t.quadrant == 1
+
+
+# ---------------------------------------------------------------------------
+# F3 — reorder_task (US-11)
+# ---------------------------------------------------------------------------
+
+def test_reorder_up_troca_com_anterior(svc):
+    user = _user(svc)
+    lst = _list(svc, user)
+    t1 = _task_f3(svc, user, list_id=lst.id, sort_order=0)
+    t2 = _task_f3(svc, user, list_id=lst.id, sort_order=1)
+
+    result = task_service.reorder_task(t2.id, "up")
+    svc.refresh(t1)
+    svc.refresh(t2)
+
+    assert result is True
+    assert t2.sort_order == 0
+    assert t1.sort_order == 1
+
+
+def test_reorder_down_troca_com_proxima(svc):
+    user = _user(svc)
+    lst = _list(svc, user)
+    t1 = _task_f3(svc, user, list_id=lst.id, sort_order=0)
+    t2 = _task_f3(svc, user, list_id=lst.id, sort_order=1)
+
+    result = task_service.reorder_task(t1.id, "down")
+    svc.refresh(t1)
+    svc.refresh(t2)
+
+    assert result is True
+    assert t1.sort_order == 1
+    assert t2.sort_order == 0
+
+
+def test_reorder_up_primeira_retorna_false(svc):
+    user = _user(svc)
+    lst = _list(svc, user)
+    t = _task_f3(svc, user, list_id=lst.id, sort_order=0)
+
+    result = task_service.reorder_task(t.id, "up")
+
+    assert result is False
+
+
+def test_reorder_down_ultima_retorna_false(svc):
+    user = _user(svc)
+    lst = _list(svc, user)
+    t = _task_f3(svc, user, list_id=lst.id, sort_order=0)
+
+    result = task_service.reorder_task(t.id, "down")
+
+    assert result is False
+
+
+def test_reorder_inexistente_retorna_false(svc):
+    result = task_service.reorder_task(uuid.uuid4(), "up")
+
+    assert result is False
+
+
+def test_reorder_nao_cruza_lista_diferente(svc):
+    """Tarefas de listas distintas não interferem na reordenação."""
+    user = _user(svc)
+    lst_a = _list(svc, user, name="Lista A", sort_order=0)
+    lst_b = _list(svc, user, name="Lista B", sort_order=1)
+    t_a = _task_f3(svc, user, list_id=lst_a.id, sort_order=0)
+    t_b = _task_f3(svc, user, list_id=lst_b.id, sort_order=1)
+
+    result = task_service.reorder_task(t_a.id, "up")
+
+    assert result is False
+    svc.refresh(t_b)
+    assert t_b.sort_order == 1

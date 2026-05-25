@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import Session, selectinload
 
 from src.db.models import Config, Task, TaskList, User
 from src.db.session import get_session
@@ -267,7 +267,7 @@ def save_classified_tasks(
     tarefas: list[dict],
     user_name: str = "Jamile",
 ) -> list[Task]:
-    """Persiste tarefas classificadas pela IA aplicando regras de pós-processamento (spec §7).
+    """Persiste tarefas classificadas pela IA com regras de pós-processamento (spec §7).
 
     Impedimento externo (pessoa/recurso_info/data_externa) → status 'aguardando'.
     """
@@ -333,3 +333,123 @@ def save_classified_tasks(
             saved.append(task)
 
         return saved
+
+
+# ---------------------------------------------------------------------------
+# Seleção "/agora" (F3 — US-12)
+# ---------------------------------------------------------------------------
+
+_ENERGY_LEVEL: dict[str, int] = {"baixa": 1, "media": 2, "alta": 3}
+
+
+def get_task_with_list(task_id: str | uuid.UUID) -> Optional[Task]:
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        return session.scalar(
+            select(Task).options(selectinload(Task.task_list)).where(Task.id == uid)
+        )
+
+
+def get_task_for_agora(
+    chat_id: int,
+    tempo_min: int,
+    energia: str,
+    excluir_ids: list[uuid.UUID] | None = None,
+) -> Optional[Task]:
+    """Retorna a melhor tarefa para o momento (spec §5).
+
+    Filtra por tempo e energia, ordena por quadrante → prazo → sort_order.
+    """
+    nivel = _ENERGY_LEVEL.get(energia, 2)
+    excluir = set(excluir_ids) if excluir_ids else set()
+
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return None
+
+        candidates = session.scalars(
+            select(Task)
+            .options(selectinload(Task.task_list))
+            .where(
+                Task.user_id == user.id,
+                Task.status == "aberta",
+                or_(Task.estimate_min <= tempo_min, Task.estimate_min.is_(None)),
+            )
+            .order_by(Task.quadrant.nullslast(), Task.due_at.nullslast(), Task.sort_order)
+        ).all()
+
+        for t in candidates:
+            if t.id in excluir:
+                continue
+            if t.energy is None or _ENERGY_LEVEL.get(t.energy, 2) <= nivel:
+                return t
+        return None
+
+
+def get_lightest_task(
+    chat_id: int,
+    excluir_ids: list[uuid.UUID] | None = None,
+) -> Optional[Task]:
+    """Fallback /agora: retorna a tarefa mais leve disponível."""
+    excluir = set(excluir_ids) if excluir_ids else set()
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return None
+        tasks = session.scalars(
+            select(Task)
+            .options(selectinload(Task.task_list))
+            .where(Task.user_id == user.id, Task.status == "aberta")
+            .order_by(Task.estimate_min.nullslast(), Task.quadrant.nullslast(), Task.sort_order)
+        ).all()
+        for t in tasks:
+            if t.id not in excluir:
+                return t
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Edição de atributos e ordenação (F3 — US-07, 08, 09, 10, 11)
+# ---------------------------------------------------------------------------
+
+def update_task_attrs(task_id: str | uuid.UUID, **kwargs) -> Optional[Task]:
+    """Atualiza atributos de tarefa. Campos: quadrant, energy, estimate_min, due_at, list_id, next_step."""
+    _allowed = {"quadrant", "energy", "estimate_min", "due_at", "list_id", "next_step"}
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        task = session.get(Task, uid)
+        if task is None:
+            return None
+        for k, v in kwargs.items():
+            if k in _allowed:
+                setattr(task, k, v)
+        task.last_touched_at = _now()
+        return task
+
+
+def reorder_task(task_id: str | uuid.UUID, direction: str) -> bool:
+    """Troca sort_order com a tarefa adjacente na mesma lista. direction: 'up' | 'down'."""
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        task = session.get(Task, uid)
+        if task is None:
+            return False
+
+        base = select(Task).where(
+            Task.user_id == task.user_id,
+            Task.list_id == task.list_id,
+            Task.status == "aberta",
+        )
+        if direction == "up":
+            adjacent = session.scalar(
+                base.where(Task.sort_order < task.sort_order).order_by(Task.sort_order.desc())
+            )
+        else:
+            adjacent = session.scalar(
+                base.where(Task.sort_order > task.sort_order).order_by(Task.sort_order)
+            )
+        if adjacent is None:
+            return False
+        task.sort_order, adjacent.sort_order = adjacent.sort_order, task.sort_order
+        return True
