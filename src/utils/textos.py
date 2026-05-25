@@ -153,3 +153,61 @@ LIST_EMOJI: dict[str, str] = {
 
 def lista_emoji(slug: str) -> str:
     return LIST_EMOJI.get(slug, "📋")
+
+
+# ---------------------------------------------------------------------------
+# Classificação / Brain dump (F2)
+# ---------------------------------------------------------------------------
+
+_ENERGIA_EMOJI = {"alta": "⚡", "media": "🔋", "baixa": "🪫"}
+_QUADRANT_LABEL = {1: "Q1 🔴", 2: "Q2 🟡", 3: "Q3 🔵", 4: "Q4 ⚪"}
+
+
+def msg_classificacao_resumo(tarefas: list[dict]) -> str:
+    """Monta o resumo numerado das tarefas classificadas pela IA."""
+    n = len(tarefas)
+    header = f"Entendi {'1 tarefa' if n == 1 else f'{n} tarefas'}:\n"
+    linhas: list[str] = []
+
+    for i, t in enumerate(tarefas, 1):
+        lista = t.get("lista_sugerida")
+        destino = lista if lista else "📥 Inbox"
+        detalhes: list[str] = [f"→ {destino}"]
+
+        q = t.get("quadrante_sugerido")
+        if q:
+            detalhes.append(_QUADRANT_LABEL[q])
+
+        est = t.get("estimativa_min")
+        if est:
+            detalhes.append(f"{est}min")
+
+        energia = t.get("energia", "")
+        if energia in _ENERGIA_EMOJI:
+            detalhes.append(_ENERGIA_EMOJI[energia])
+
+        linha = f"{i}. {t.get('titulo', '')}\n   {' · '.join(detalhes)}"
+
+        if t.get("impedimento") == "vaga_grande" and t.get("proximo_passo"):
+            linha += f"\n   💡 {t['proximo_passo']}"
+
+        linhas.append(linha)
+
+    return header + "\n\n".join(linhas)
+
+
+def msg_ajustar_tarefa(tarefa: dict, index: int, total: int) -> str:
+    lista_atual = tarefa.get("lista_sugerida") or "Inbox"
+    titulo = tarefa.get("titulo", "")
+    return (
+        f"Tarefa {index + 1} de {total}: \"{titulo}\"\n"
+        f"Sugerida para: {lista_atual}\n\n"
+        "Onde colocar?"
+    )
+
+
+def msg_captura_salva(n: int) -> str:
+    return f"{'Tarefa salva' if n == 1 else f'{n} tarefas salvas'} ✅"
+
+
+MSG_CLASSIFICANDO = "Classificando... 🧠"

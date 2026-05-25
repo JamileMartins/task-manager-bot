@@ -13,7 +13,14 @@ from telegram.ext import (
 
 from src.config import TELEGRAM_BOT_TOKEN
 from src.db.session import create_tables
-from src.handlers.capture import cb_undo_capture, handle_capture
+from src.handlers.capture import (
+    cb_adj_task,
+    cb_adjust_capture,
+    cb_approve_capture,
+    cb_cancel_capture,
+    cb_undo_capture,
+    handle_capture,
+)
 from src.handlers.common import (
     cmd_ajuda,
     cmd_inbox,
@@ -70,6 +77,10 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(cb_view_inbox, pattern=r"^view_inbox$"))
     app.add_handler(CallbackQueryHandler(cb_complete_task, pattern=r"^complete_task:"))
     app.add_handler(CallbackQueryHandler(cb_back_to_lists, pattern=r"^back_to_lists$"))
+    app.add_handler(CallbackQueryHandler(cb_approve_capture, pattern=r"^approve_capture$"))
+    app.add_handler(CallbackQueryHandler(cb_cancel_capture, pattern=r"^cancel_capture$"))
+    app.add_handler(CallbackQueryHandler(cb_adjust_capture, pattern=r"^adjust_capture$"))
+    app.add_handler(CallbackQueryHandler(cb_adj_task, pattern=r"^adj:"))
     app.add_handler(CallbackQueryHandler(cb_undo_capture, pattern=r"^undo_task:"))
 
     # Callbacks de gerenciamento de listas
