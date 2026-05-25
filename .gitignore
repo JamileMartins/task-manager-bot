@@ -33,3 +33,5 @@ logs/
 # IDE
 .vscode/
 .idea/
+.claude/settings.local.json
+*.code-workspace
