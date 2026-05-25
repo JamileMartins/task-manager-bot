@@ -54,6 +54,7 @@ from src.handlers.rituals import (
 )
 from src.handlers.agora import (
     cb_agora_adiar,
+    cb_agora_adiar_date,
     cb_agora_concluir,
     cb_agora_energia,
     cb_agora_outra,
@@ -176,6 +177,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(cb_agora_concluir, pattern=r"^ag_ok:"))
     app.add_handler(CallbackQueryHandler(cb_agora_outra, pattern=r"^ag_nx:"))
     app.add_handler(CallbackQueryHandler(cb_agora_adiar, pattern=r"^ag_ad:"))
+    app.add_handler(CallbackQueryHandler(cb_agora_adiar_date, pattern=r"^ag_adf:"))
 
     # Detalhe e edição de tarefa
     app.add_handler(CallbackQueryHandler(cb_task_detail, pattern=r"^task_dt:"))

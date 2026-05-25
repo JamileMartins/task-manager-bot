@@ -395,3 +395,19 @@ def kb_agora_task(task_id: uuid.UUID) -> InlineKeyboardMarkup:
         ],
         [InlineKeyboardButton("😴 Adiar", callback_data=f"ag_ad:{task_id}")],
     ])
+
+
+def kb_lembrete(task_id: uuid.UUID) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ Concluir", callback_data=f"complete_task:{task_id}"),
+        InlineKeyboardButton("😴 Adiar", callback_data=f"ag_ad:{task_id}"),
+    ]])
+
+
+def kb_agora_adiar(task_id: uuid.UUID) -> InlineKeyboardMarkup:
+    tid = str(task_id)
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("Amanhã", callback_data=f"ag_adf:{tid}:1"),
+        InlineKeyboardButton("3 dias", callback_data=f"ag_adf:{tid}:3"),
+        InlineKeyboardButton("1 semana", callback_data=f"ag_adf:{tid}:7"),
+    ]])

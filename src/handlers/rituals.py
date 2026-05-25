@@ -13,14 +13,17 @@ from src.services.task_service import (
     archive_task,
     get_config,
     get_daily_summary_tasks,
+    get_due_reminders,
     get_stale_tasks,
     get_stale_waiting_tasks,
     get_task_with_list,
+    mark_reminder_sent,
     reschedule_task,
     unblock_task,
 )
 from src.utils.keyboards import (
     kb_blocker_cobrar_date,
+    kb_lembrete,
     kb_revisao_abertura,
     kb_revisao_espera,
     kb_revisao_reagendar,
@@ -31,6 +34,7 @@ from src.utils.textos import (
     MSG_REVISAO_ESPERAS_ABERTURA,
     MSG_REVISAO_NADA,
     msg_diario_focos,
+    msg_lembrete,
     msg_revisao_abertura,
     msg_revisao_encerramento,
     msg_revisao_espera,
@@ -53,6 +57,27 @@ def _rev_clear(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
 # ---------------------------------------------------------------------------
 # Jobs
 # ---------------------------------------------------------------------------
+
+async def send_reminders(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Job a cada minuto: dispara lembretes vencidos (US-17)."""
+    try:
+        due = get_due_reminders()
+    except Exception:
+        logger.exception("Erro ao buscar lembretes vencidos")
+        return
+
+    for reminder, task, chat_id in due:
+        try:
+            await context.bot.send_message(
+                chat_id,
+                msg_lembrete(task.title),
+                reply_markup=kb_lembrete(task.id),
+                parse_mode="Markdown",
+            )
+            mark_reminder_sent(reminder.id)
+        except Exception:
+            logger.exception("Erro ao enviar lembrete %s", reminder.id)
+
 
 async def send_daily_summary(context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = context.job.data["chat_id"]
@@ -314,6 +339,7 @@ def setup_jobs(app, chat_id: int) -> None:
         return
     _schedule_daily(app, chat_id, cfg)
     _schedule_weekly(app, chat_id, cfg)
+    app.job_queue.run_repeating(send_reminders, interval=60, first=10, name="reminders")
 
 
 def _schedule_daily(app, chat_id: int, cfg) -> None:

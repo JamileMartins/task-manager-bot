@@ -88,7 +88,27 @@ async def cb_agora_adiar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await query.answer()
     if not is_authorized(update):
         return
-    await query.edit_message_text(textos.MSG_AGORA_ADIAR_PENDENTE)
+    task_id = uuid.UUID(query.data.split(":")[1])
+    await query.edit_message_text(
+        textos.MSG_AGORA_ADIAR_QUANDO,
+        reply_markup=keyboards.kb_agora_adiar(task_id),
+    )
+
+
+async def cb_agora_adiar_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+    parts = query.data.split(":")
+    task_id = parts[1]
+    days = int(parts[2])
+    try:
+        await asyncio.to_thread(task_service.reschedule_task, task_id, days)
+        await query.edit_message_text(textos.msg_agora_adiada(days))
+    except Exception:
+        logger.exception("Erro ao adiar tarefa do /agora")
+        await query.edit_message_text(textos.MSG_ERRO_GENERICO)
 
 
 async def _show_agora_task(

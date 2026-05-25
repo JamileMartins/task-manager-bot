@@ -165,7 +165,7 @@
 - **CA:**
   - Botões "amanhã", "próxima semana", "escolher data".
   - A tarefa sai dos focos de hoje e reaparece na nova data.
-- Prioridade: Should · Fase: F4 · **Status: ⚠️ Parcial** (botão existe no /agora mas ação ainda não implementada)
+- Prioridade: Should · Fase: F4 · **Status: ✅ Feito**
 
 ---
 
@@ -200,7 +200,7 @@
 - **CA:**
   - Tarefas com data/hora geram lembrete no horário.
   - O lembrete traz botões de concluir/adiar.
-- Prioridade: Should · Fase: F4 · **Status: ❌ Pendente** (modelo/schema ok; falta o job de disparo)
+- Prioridade: Should · Fase: F4 · **Status: ✅ Feito**
 
 ### US-18 — Recorrência
 
@@ -311,7 +311,7 @@
 - **CA:**
   - Se o texto indicar dependência externa, a tarefa é criada em status "aguardando".
   - O resumo de captura mostra o impedimento detectado para eu confirmar.
-- Prioridade: Should · Fase: F4 · **Status: ❌ Pendente** (campo `impedimento` chegou no JSON da IA, mas o handler de captura não usa ainda)
+- Prioridade: Should · Fase: F4 · **Status: ✅ Feito** (`save_classified_tasks` aplica status `aguardando` para impedimentos externos; resumo exibe marcador visual)
 
 ### US-28 — Resolver/desbloquear impedimento
 
@@ -345,7 +345,6 @@
 | F1 | US-01, US-05, US-06, US-13, US-21 | ✅ Completa |
 | F2 | US-02, US-03, US-04 | ✅ Completa |
 | F3 | US-07, US-08, US-09, US-10, US-11, US-12 | ✅ Completa |
-| F4 | US-15, US-16, US-20, US-23, US-24, US-25, US-26, US-28, US-29 | ✅ Feitas |
-| F4 | US-14 | ⚠️ Parcial |
-| F4 | US-17, US-18, US-27 | ❌ Pendentes |
+| F4 | US-14, US-15, US-16, US-17, US-20, US-23, US-24, US-25, US-26, US-27, US-28, US-29 | ✅ Feitas |
+| F4 | US-18 | ❌ Pendente |
 | F5 | US-19, US-22 | ❌ Pendentes |

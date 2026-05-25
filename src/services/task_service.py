@@ -11,7 +11,7 @@ from typing import Optional
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from src.db.models import Config, Task, TaskList, User
+from src.db.models import Config, Reminder, Task, TaskList, User
 from src.db.session import get_session
 
 
@@ -425,6 +425,8 @@ def update_task_attrs(task_id: str | uuid.UUID, **kwargs) -> Optional[Task]:
             if k in _allowed:
                 setattr(task, k, v)
         task.last_touched_at = _now()
+        if "due_at" in kwargs:
+            _sync_reminder(session, task)
         return task
 
 
@@ -683,7 +685,46 @@ def reschedule_task(task_id: str | uuid.UUID, days: int) -> Optional[Task]:
             return None
         task.due_at = _now() + timedelta(days=days)
         task.last_touched_at = _now()
+        _sync_reminder(session, task)
         return task
+
+
+# ---------------------------------------------------------------------------
+# Lembretes (US-17)
+# ---------------------------------------------------------------------------
+
+def _sync_reminder(session: Session, task: Task) -> None:
+    """Cria/atualiza/remove o lembrete único da tarefa com base em due_at."""
+    existing = session.scalar(
+        select(Reminder).where(Reminder.task_id == task.id, Reminder.sent.is_(False))
+    )
+    if task.due_at is None:
+        if existing:
+            session.delete(existing)
+        return
+    if existing:
+        existing.remind_at = task.due_at
+    else:
+        session.add(Reminder(task_id=task.id, remind_at=task.due_at))
+
+
+def get_due_reminders() -> list[tuple[Reminder, Task, int]]:
+    """Retorna lembretes vencidos ainda não enviados com a tarefa e o chat_id do usuário."""
+    with get_session() as session:
+        rows = session.execute(
+            select(Reminder, Task, User.telegram_chat_id)
+            .join(Task, Task.id == Reminder.task_id)
+            .join(User, User.id == Task.user_id)
+            .where(Reminder.sent.is_(False), Reminder.remind_at <= _now())
+        ).all()
+        return [(r, t, chat_id) for r, t, chat_id in rows]
+
+
+def mark_reminder_sent(reminder_id: uuid.UUID) -> None:
+    with get_session() as session:
+        r = session.get(Reminder, reminder_id)
+        if r:
+            r.sent = True
 
 
 def reorder_task(task_id: str | uuid.UUID, direction: str) -> bool:

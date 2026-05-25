@@ -225,6 +225,8 @@ def msg_classificacao_resumo(tarefas: list[dict]) -> str:
 
         if t.get("impedimento") == "vaga_grande" and t.get("proximo_passo"):
             linha += f"\n   💡 {t['proximo_passo']}"
+        elif t.get("impedimento_externo"):
+            linha += "\n   ⏳ Criada como aguardando (impedimento externo detectado)"
 
         linhas.append(linha)
 
@@ -259,6 +261,15 @@ MSG_AGORA_NADA = (
     "Aproveita para descansar ou me manda algo novo."
 )
 MSG_AGORA_ADIAR_PENDENTE = "Adiamento chega na próxima versão — por enquanto, pula ou conclui 😊"
+MSG_AGORA_ADIAR_QUANDO = "Para quando você quer adiar? 😴"
+
+
+def msg_agora_adiada(days: int) -> str:
+    if days == 1:
+        return "Guardado para amanhã ✅\nVoltamos a isso depois!"
+    if days <= 3:
+        return f"Guardado para daqui {days} dias ✅\nVoltamos a isso depois!"
+    return "Guardado para a próxima semana ✅\nVoltamos a isso depois!"
 
 
 def msg_agora_tarefa(task, fallback: bool = False) -> str:
@@ -399,6 +410,14 @@ MSG_BLOCKER_OBSOLETA = (
 MSG_BLOCKER_ARQUIVADA = "Arquivada sem culpa 🗑️"
 MSG_BLOCKER_KEEP = "Ok, mantida como está."
 MSG_UNBLOCK_OK = "Destravada ✅ Voltou pras suas tarefas ativas."
+
+
+# ---------------------------------------------------------------------------
+# Lembretes (US-17)
+# ---------------------------------------------------------------------------
+
+def msg_lembrete(task_title: str) -> str:
+    return f"⏰ Lembrete!\n\n*{task_title}*\n\nHora de atacar essa."
 
 
 # ---------------------------------------------------------------------------
