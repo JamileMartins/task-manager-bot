@@ -336,6 +336,10 @@ def msg_task_detail(task) -> str:
     elif task.blocker_type:
         lines.append(f"\n⚠️ Travada: {_BLOCKER_LABEL.get(task.blocker_type, task.blocker_type)}")
 
+    _REC_LABEL = {"daily": "🔁 Diária", "weekly": "🔁 Semanal", "monthly": "🔁 Mensal"}
+    if task.recurrence and task.recurrence in _REC_LABEL:
+        lines.append(_REC_LABEL[task.recurrence])
+
     if task.next_step:
         lines.append(f"💡 Próximo passo: {task.next_step}")
     return "\n".join(lines)

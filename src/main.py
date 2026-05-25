@@ -94,6 +94,7 @@ from src.handlers.task_detail import (
     cb_task_set_energy,
     cb_task_set_estimate,
     cb_task_set_quadrant,
+    cb_task_set_recurrence,
     cb_task_start_move,
 )
 from src.handlers.tasks import (
@@ -185,6 +186,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(cb_task_set_energy, pattern=r"^task_e:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_estimate, pattern=r"^task_m:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_due, pattern=r"^task_d:"))
+    app.add_handler(CallbackQueryHandler(cb_task_set_recurrence, pattern=r"^task_rec:"))
     app.add_handler(CallbackQueryHandler(cb_task_start_move, pattern=r"^task_list:"))
     app.add_handler(CallbackQueryHandler(cb_task_move_to, pattern=r"^mv:"))
     app.add_handler(CallbackQueryHandler(cb_task_reorder, pattern=r"^task_up:"))

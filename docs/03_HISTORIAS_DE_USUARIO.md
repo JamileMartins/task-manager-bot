@@ -210,7 +210,7 @@
 - **CA:**
   - Posso marcar diária/semanal/mensal.
   - Ao concluir uma ocorrência, a próxima é criada automaticamente.
-- Prioridade: Should · Fase: F4 · **Status: ❌ Pendente** (campo `recurrence` existe no modelo; falta a lógica de criação automática)
+- Prioridade: Should · Fase: F4 · **Status: ✅ Feito**
 
 ---
 
@@ -345,6 +345,5 @@
 | F1 | US-01, US-05, US-06, US-13, US-21 | ✅ Completa |
 | F2 | US-02, US-03, US-04 | ✅ Completa |
 | F3 | US-07, US-08, US-09, US-10, US-11, US-12 | ✅ Completa |
-| F4 | US-14, US-15, US-16, US-17, US-20, US-23, US-24, US-25, US-26, US-27, US-28, US-29 | ✅ Feitas |
-| F4 | US-18 | ❌ Pendente |
+| F4 | US-14, US-15, US-16, US-17, US-18, US-20, US-23, US-24, US-25, US-26, US-27, US-28, US-29 | ✅ Completa |
 | F5 | US-19, US-22 | ❌ Pendentes |

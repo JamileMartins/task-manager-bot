@@ -114,6 +114,22 @@ async def cb_task_set_estimate(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 # ---------------------------------------------------------------------------
+# Recorrência (US-18)
+# ---------------------------------------------------------------------------
+
+async def cb_task_set_recurrence(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+    parts = query.data.split(":")
+    task_id = uuid.UUID(parts[1])
+    value = None if parts[2] == "none" else parts[2]
+    await asyncio.to_thread(task_service.update_task_attrs, task_id, recurrence=value)
+    await _refresh_detail(query, task_id, context)
+
+
+# ---------------------------------------------------------------------------
 # Definir prazo (US-09)
 # ---------------------------------------------------------------------------
 

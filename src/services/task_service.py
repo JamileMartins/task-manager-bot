@@ -128,6 +128,13 @@ def delete_task(task_id: str | uuid.UUID) -> bool:
 # Tarefas — conclusão
 # ---------------------------------------------------------------------------
 
+_RECURRENCE_DELTA: dict[str, timedelta] = {
+    "daily": timedelta(days=1),
+    "weekly": timedelta(weeks=1),
+    "monthly": timedelta(days=30),
+}
+
+
 def complete_task(task_id: str | uuid.UUID) -> bool:
     uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
     with get_session() as session:
@@ -138,6 +145,30 @@ def complete_task(task_id: str | uuid.UUID) -> bool:
         task.status = "concluida"
         task.completed_at = now
         task.last_touched_at = now
+
+        if task.recurrence and task.recurrence in _RECURRENCE_DELTA:
+            delta = _RECURRENCE_DELTA[task.recurrence]
+            base = task.due_at if task.due_at else now
+            next_due = base + delta
+            next_task = Task(
+                user_id=task.user_id,
+                list_id=task.list_id,
+                title=task.title,
+                notes=task.notes,
+                quadrant=task.quadrant,
+                due_at=next_due,
+                recurrence=task.recurrence,
+                estimate_min=task.estimate_min,
+                energy=task.energy,
+                status="aberta",
+                sort_order=task.sort_order,
+                created_at=now,
+                last_touched_at=now,
+            )
+            session.add(next_task)
+            session.flush()
+            _sync_reminder(session, next_task)
+
         return True
 
 
@@ -414,8 +445,8 @@ def get_lightest_task(
 # ---------------------------------------------------------------------------
 
 def update_task_attrs(task_id: str | uuid.UUID, **kwargs) -> Optional[Task]:
-    """Atualiza atributos de tarefa. Campos: quadrant, energy, estimate_min, due_at, list_id, next_step."""
-    _allowed = {"quadrant", "energy", "estimate_min", "due_at", "list_id", "next_step"}
+    """Atualiza atributos de tarefa. Campos: quadrant, energy, estimate_min, due_at, list_id, next_step, recurrence."""
+    _allowed = {"quadrant", "energy", "estimate_min", "due_at", "list_id", "next_step", "recurrence"}
     uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
     with get_session() as session:
         task = session.get(Task, uid)

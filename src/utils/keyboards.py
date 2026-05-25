@@ -164,6 +164,12 @@ def kb_task_detail(task: Task, listas: list[dict]) -> InlineKeyboardMarkup:
             InlineKeyboardButton("📅 Amanhã", callback_data=f"task_d:{task.id}:amanha"),
             InlineKeyboardButton("🚫 Sem prazo", callback_data=f"task_d:{task.id}:none"),
         ])
+
+        r_row = []
+        for val, label in [("daily", "🔁 Diária"), ("weekly", "🔁 Semanal"), ("monthly", "🔁 Mensal"), (None, "🚫 Sem rep.")]:
+            mark = " ✓" if task.recurrence == val else ""
+            r_row.append(InlineKeyboardButton(label + mark, callback_data=f"task_rec:{task.id}:{val or 'none'}"))
+        rows.append(r_row)
         rows.append([
             InlineKeyboardButton("📂 Mover lista", callback_data=f"task_list:{task.id}"),
             InlineKeyboardButton("↑", callback_data=f"task_up:{task.id}"),
