@@ -256,3 +256,80 @@ def archive_list(list_id: uuid.UUID) -> Optional[str]:
             return None
         lst.archived = True
         return lst.name
+
+
+# ---------------------------------------------------------------------------
+# Tarefas — salvar classificação da IA (F2)
+# ---------------------------------------------------------------------------
+
+def save_classified_tasks(
+    chat_id: int,
+    tarefas: list[dict],
+    user_name: str = "Jamile",
+) -> list[Task]:
+    """Persiste tarefas classificadas pela IA aplicando regras de pós-processamento (spec §7).
+
+    Impedimento externo (pessoa/recurso_info/data_externa) → status 'aguardando'.
+    """
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            user = User(
+                telegram_chat_id=chat_id,
+                name=user_name,
+                timezone="America/Fortaleza",
+                created_at=_now(),
+            )
+            session.add(user)
+            session.flush()
+            _create_initial_lists(session, user)
+
+        lista_map: dict[str, uuid.UUID] = {
+            lst.name: lst.id
+            for lst in session.scalars(
+                select(TaskList).where(
+                    TaskList.user_id == user.id,
+                    TaskList.archived.is_(False),
+                )
+            ).all()
+        }
+
+        now = _now()
+        saved: list[Task] = []
+
+        for t in tarefas:
+            list_name = t.get("lista_sugerida")
+            list_id = lista_map.get(list_name) if list_name else None
+
+            is_external = bool(t.get("impedimento_externo"))
+            status = "aguardando" if is_external else "aberta"
+
+            prazo: Optional[datetime] = None
+            if t.get("prazo_sugerido"):
+                try:
+                    prazo = datetime.fromisoformat(t["prazo_sugerido"])
+                except ValueError:
+                    pass
+
+            task = Task(
+                user_id=user.id,
+                list_id=list_id,
+                title=(t.get("titulo") or "")[:500],
+                status=status,
+                quadrant=t.get("quadrante_sugerido"),
+                estimate_min=t.get("estimativa_min"),
+                energy=t.get("energia"),
+                blocker_type=t.get("impedimento"),
+                blocker_is_external=is_external if t.get("impedimento") else None,
+                next_step=t.get("proximo_passo"),
+                due_at=prazo,
+                waiting_since=now if is_external else None,
+                sort_order=0,
+                created_at=now,
+                last_touched_at=now,
+            )
+            session.add(task)
+            session.flush()
+            saved.append(task)
+
+        return saved

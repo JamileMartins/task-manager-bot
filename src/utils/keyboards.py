@@ -84,6 +84,40 @@ def kb_tasks(tasks: Sequence[Task], list_id: uuid.UUID | None = None) -> InlineK
     return InlineKeyboardMarkup(rows)
 
 
+def kb_classificacao_resumo() -> InlineKeyboardMarkup:
+    """Teclado exibido após o resumo da classificação da IA."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Aprovar tudo", callback_data="approve_capture")],
+        [
+            InlineKeyboardButton("✏️ Ajustar", callback_data="adjust_capture"),
+            InlineKeyboardButton("❌ Cancelar", callback_data="cancel_capture"),
+        ],
+    ])
+
+
+def kb_ajustar_tarefa(
+    task_idx: int,
+    listas: list[dict],
+) -> InlineKeyboardMarkup:
+    """Teclado de seleção de lista para uma tarefa durante o ajuste item a item."""
+    from src.utils.textos import lista_emoji
+    rows: list[list[InlineKeyboardButton]] = []
+    row: list[InlineKeyboardButton] = []
+    for i, lista in enumerate(listas):
+        emoji = lista_emoji(lista["slug"])
+        row.append(InlineKeyboardButton(
+            f"{emoji} {lista['name']}",
+            callback_data=f"adj:{task_idx}:{i}",
+        ))
+        if len(row) == 2:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append([InlineKeyboardButton("📥 Inbox", callback_data=f"adj:{task_idx}:-1")])
+    return InlineKeyboardMarkup(rows)
+
+
 def kb_inbox(tasks: Sequence[Task]) -> InlineKeyboardMarkup:
     """Botão ✅ numerado para tarefas da Inbox + botão Voltar."""
     rows = []

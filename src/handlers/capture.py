@@ -1,18 +1,51 @@
-"""Handler de captura por texto livre → Inbox (US-01)."""
+"""Handler de captura por texto livre com classificação via IA (F1/F2)."""
 from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Any
 
 from telegram import Update
+from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
 from src.handlers.common import deny_unauthorized, is_authorized
-from src.services import task_service
+from src.services import ai_service, task_service
 from src.utils import keyboards, textos
 
 logger = logging.getLogger(__name__)
 
+# Chave no user_data onde ficam as tarefas pendentes de aprovação
+_PENDING_KEY = "pending_capture"
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _pending(context: ContextTypes.DEFAULT_TYPE) -> dict[str, Any] | None:
+    return context.user_data.get(_PENDING_KEY)
+
+
+def _set_pending(
+    context: ContextTypes.DEFAULT_TYPE,
+    tasks: list[dict],
+    listas: list[dict],
+) -> None:
+    context.user_data[_PENDING_KEY] = {
+        "tasks": tasks,
+        "listas": listas,
+        "adj_index": 0,
+    }
+
+
+def _clear_pending(context: ContextTypes.DEFAULT_TYPE) -> None:
+    context.user_data.pop(_PENDING_KEY, None)
+
+
+# ---------------------------------------------------------------------------
+# Captura (entrada de texto livre)
+# ---------------------------------------------------------------------------
 
 async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_authorized(update):
@@ -23,24 +56,176 @@ async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not text:
         return
 
+    await update.message.reply_chat_action(ChatAction.TYPING)
+
+    chat_id = update.effective_chat.id
+    user_name = update.effective_user.full_name or "Jamile"
+
     try:
-        user_name = update.effective_user.full_name or "Jamile"
-        task = await asyncio.to_thread(
-            task_service.create_task_in_inbox, update.effective_chat.id, text, user_name
+        listas_info = await asyncio.to_thread(task_service.get_user_lists, chat_id)
+        if not listas_info:
+            # Usuária ainda não tem listas — cria usuário agora
+            await asyncio.to_thread(task_service.get_or_create_user, chat_id, user_name)
+            listas_info = await asyncio.to_thread(task_service.get_user_lists, chat_id)
+
+        nomes_listas = [l.name for l in listas_info]
+        listas_dicts = [{"name": l.name, "slug": l.slug, "id": str(l.id)} for l in listas_info]
+
+        tarefas = await asyncio.to_thread(
+            ai_service.classificar_brain_dump, text, nomes_listas
         )
+
+        _set_pending(context, tarefas, listas_dicts)
+
+        resumo = textos.msg_classificacao_resumo(tarefas)
         await update.message.reply_text(
-            textos.msg_captura_confirmacao(),
-            reply_markup=keyboards.kb_undo_capture(task.id),
+            resumo,
+            reply_markup=keyboards.kb_classificacao_resumo(),
         )
     except Exception:
-        logger.exception("Erro ao capturar tarefa")
-        await update.message.reply_text(textos.MSG_ERRO_GENERICO)
+        logger.exception("Erro ao classificar captura")
+        # Fallback: salvar tudo na Inbox sem classificação
+        try:
+            await asyncio.to_thread(
+                task_service.create_task_in_inbox, chat_id, text, user_name
+            )
+            await update.message.reply_text(textos.MSG_CAPTURA_FALLBACK)
+        except Exception:
+            logger.exception("Erro também no fallback de captura")
+            await update.message.reply_text(textos.MSG_ERRO_GENERICO)
 
+
+# ---------------------------------------------------------------------------
+# Aprovar tudo
+# ---------------------------------------------------------------------------
+
+async def cb_approve_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+
+    pending = _pending(context)
+    if not pending:
+        await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+        return
+
+    chat_id = update.effective_chat.id
+    user_name = update.effective_user.full_name or "Jamile"
+
+    try:
+        saved = await asyncio.to_thread(
+            task_service.save_classified_tasks,
+            chat_id,
+            pending["tasks"],
+            user_name,
+        )
+        _clear_pending(context)
+        await query.edit_message_text(textos.msg_captura_salva(len(saved)))
+    except Exception:
+        logger.exception("Erro ao salvar tarefas classificadas")
+        await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+
+
+# ---------------------------------------------------------------------------
+# Cancelar captura
+# ---------------------------------------------------------------------------
+
+async def cb_cancel_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+    _clear_pending(context)
+    await query.edit_message_text(textos.MSG_CANCELADO)
+
+
+# ---------------------------------------------------------------------------
+# Ajustar item a item
+# ---------------------------------------------------------------------------
+
+async def cb_adjust_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Inicia o fluxo de ajuste: mostra a primeira tarefa com seleção de lista."""
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+
+    pending = _pending(context)
+    if not pending:
+        await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+        return
+
+    pending["adj_index"] = 0
+    await _show_task_for_adjustment(query, pending)
+
+
+async def cb_adj_task(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Recebe a seleção de lista para a tarefa atual e avança para a próxima."""
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+
+    pending = _pending(context)
+    if not pending:
+        await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+        return
+
+    # callback_data = "adj:{task_idx}:{list_idx}"  (-1 = Inbox)
+    parts = query.data.split(":")
+    task_idx = int(parts[1])
+    list_idx = int(parts[2])
+
+    tasks = pending["tasks"]
+    listas = pending["listas"]
+
+    if 0 <= task_idx < len(tasks):
+        if list_idx == -1:
+            tasks[task_idx]["lista_sugerida"] = None
+        elif 0 <= list_idx < len(listas):
+            tasks[task_idx]["lista_sugerida"] = listas[list_idx]["name"]
+
+    next_idx = task_idx + 1
+    pending["adj_index"] = next_idx
+
+    if next_idx < len(tasks):
+        await _show_task_for_adjustment(query, pending)
+    else:
+        # Todas as tarefas revisadas — salvar agora
+        chat_id = update.effective_chat.id
+        user_name = update.effective_user.full_name or "Jamile"
+        try:
+            saved = await asyncio.to_thread(
+                task_service.save_classified_tasks,
+                chat_id,
+                tasks,
+                user_name,
+            )
+            _clear_pending(context)
+            await query.edit_message_text(textos.msg_captura_salva(len(saved)))
+        except Exception:
+            logger.exception("Erro ao salvar tarefas após ajuste")
+            await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+
+
+async def _show_task_for_adjustment(query, pending: dict) -> None:
+    idx = pending["adj_index"]
+    tasks = pending["tasks"]
+    listas = pending["listas"]
+    task = tasks[idx]
+    texto = textos.msg_ajustar_tarefa(task, idx, len(tasks))
+    kb = keyboards.kb_ajustar_tarefa(idx, listas)
+    await query.edit_message_text(texto, reply_markup=kb)
+
+
+# ---------------------------------------------------------------------------
+# Desfazer captura única (F1 — mantido para compatibilidade)
+# ---------------------------------------------------------------------------
 
 async def cb_undo_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
-
     if not is_authorized(update):
         return
 
