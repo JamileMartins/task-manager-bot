@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 
 from src.config import AUTHORIZED_CHAT_ID, TELEGRAM_BOT_TOKEN
-from src.db.session import create_tables
+from src.db.session import run_migrations
 from src.handlers.blocker import (
     cb_blocker_aguardar,
     cb_blocker_archive,
@@ -119,7 +119,7 @@ logger = logging.getLogger(__name__)
 
 def main() -> None:
     logger.info("Iniciando Bot Foco...")
-    create_tables()
+    run_migrations()
 
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 

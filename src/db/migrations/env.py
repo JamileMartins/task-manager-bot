@@ -10,10 +10,15 @@ from sqlalchemy import engine_from_config, pool
 
 load_dotenv(Path(__file__).parent.parent.parent.parent / ".env")
 
-from src.db.models import Base  # noqa: E402 — must be after sys.path setup
+from src.db.models import Base  # noqa: E402
 
 config = context.config
-config.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
+
+db_url = os.environ.get("DATABASE_URL", "")
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+if db_url:
+    config.set_main_option("sqlalchemy.url", db_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
