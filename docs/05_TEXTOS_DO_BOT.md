@@ -502,7 +502,7 @@ Botões: `[ 📤 Enviar pro grupo ]` `[ ✖️ Cancelar ]`
 
 {checklist}
 
-(enviado pela Jamile via Foco)
+(enviado pela usuária via Foco)
 ```
 
 ### 10.3 Grupo não configurado

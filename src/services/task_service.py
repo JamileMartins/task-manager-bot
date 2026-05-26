@@ -65,7 +65,7 @@ def _create_initial_lists(session: Session, user: User) -> None:
     session.add(cfg)
 
 
-def get_or_create_user(chat_id: int, name: str = "Jamile") -> User:
+def get_or_create_user(chat_id: int, name: str = "usuária") -> User:
     with get_session() as session:
         user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
         if user is None:
@@ -85,7 +85,7 @@ def get_or_create_user(chat_id: int, name: str = "Jamile") -> User:
 # Tarefas — captura
 # ---------------------------------------------------------------------------
 
-def create_task_in_inbox(chat_id: int, title: str, user_name: str = "Jamile") -> Task:
+def create_task_in_inbox(chat_id: int, title: str, user_name: str = "usuária") -> Task:
     with get_session() as session:
         user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
         if user is None:
@@ -341,7 +341,7 @@ def archive_list(list_id: uuid.UUID) -> Optional[str]:
 def save_classified_tasks(
     chat_id: int,
     tarefas: list[dict],
-    user_name: str = "Jamile",
+    user_name: str = "usuária",
 ) -> list[Task]:
     """Persiste tarefas classificadas pela IA com regras de pós-processamento (spec §7).
 
@@ -544,6 +544,18 @@ def set_waiting(task_id: str | uuid.UUID, *, due_at: Optional[datetime] = None) 
         if due_at is not None:
             task.due_at = due_at
         task.last_touched_at = now
+        return task
+
+
+def reset_waiting_since(task_id: str | uuid.UUID) -> Optional[Task]:
+    """Reinicia o contador de espera (waiting_since = agora). US-29 CA."""
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        task = session.get(Task, uid)
+        if task is None:
+            return None
+        task.waiting_since = _now()
+        task.last_touched_at = _now()
         return task
 
 

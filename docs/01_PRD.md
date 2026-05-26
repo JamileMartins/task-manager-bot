@@ -3,7 +3,7 @@
 > Documento de Requisitos do Produto (Product Requirements Document)
 > Versão 1.0 — MVP
 > Autoria: especificação técnica para desenvolvimento via Claude Code
-> Usuária: Jamile (mono-usuário)
+> Sistema mono-usuário (bot particular).
 
 ---
 
@@ -56,7 +56,7 @@ Um bot de Telegram que:
 
 ## 2. Público e persona
 
-### Persona única — Jamile
+### Persona única — usuária
 
 - Professora com rotina intensa e viagens frequentes.
 - TDAH, com dificuldade em funções executivas (organizar, priorizar, iniciar).
@@ -153,7 +153,7 @@ Tarefa parada raramente é "preguiça": quase sempre há um **impedimento** não
 | --- | --- | --- |
 | RF01 | O usuário pode enviar uma mensagem de texto livre e o bot registra como tarefa(s). | Must |
 | RF02 | O bot detecta múltiplas tarefas numa só mensagem (brain dump) e as separa. | Must |
-| RF03 | O bot pré-classifica cada tarefa em uma lista usando a API do Claude. | Must |
+| RF03 | O bot pré-classifica cada tarefa em uma lista usando a Google Gemini API. | Must |
 | RF04 | O bot mostra um resumo do que foi capturado/classificado e permite aprovar em bloco ou corrigir. | Must |
 | RF05 | O usuário pode criar, renomear e arquivar listas. | Must |
 | RF06 | O usuário pode ver as tarefas de uma lista, ordenadas por quadrante/ordem manual. | Must |
@@ -195,7 +195,7 @@ Tarefa parada raramente é "preguiça": quase sempre há um **impedimento** não
 | RNF05 | **Privacidade**: dados acessíveis apenas pela usuária; tokens/segredos fora do código. |
 | RNF06 | **Latência**: resposta de captura simples em < 2s; classificação por IA em < 6s. |
 | RNF07 | **Custo baixo**: uso de camadas gratuitas/baratas (Supabase free, Railway/Fly hobby). |
-| RNF08 | **Resiliência da IA**: se a API do Claude falhar, a tarefa ainda é salva na Inbox sem classificação. |
+| RNF08 | **Resiliência da IA**: se a Google Gemini API falhar, a tarefa ainda é salva na Inbox sem classificação. |
 | RNF09 | **Tom de voz**: mensagens acolhedoras, sem culpabilizar por acúmulo (relevante p/ TDAH). |
 | RNF10 | **Restrição de acesso**: o bot responde apenas ao chat_id autorizado da usuária. |
 
@@ -206,7 +206,7 @@ Tarefa parada raramente é "preguiça": quase sempre há um **impedimento** não
 ### 6.1 Brain dump (captura + classificação)
 
 1. Usuária envia: *"comprar ração, marcar dentista, ideia: curso de bordado, pagar luz até sexta"*.
-2. Bot chama a API do Claude → separa em 4 tarefas e sugere lista + quadrante + prazo de cada uma.
+2. Bot chama a Google Gemini API → separa em 4 tarefas e sugere lista + quadrante + prazo de cada uma.
 3. Bot responde com um resumo numerado e botões: **✅ Aprovar tudo** | **✏️ Ajustar**.
 4. Em "Aprovar tudo", as tarefas são salvas. Em "Ajustar", a usuária corrige item a item.
 

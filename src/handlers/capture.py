@@ -59,7 +59,7 @@ async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.reply_chat_action(ChatAction.TYPING)
 
     chat_id = update.effective_chat.id
-    user_name = update.effective_user.full_name or "Jamile"
+    user_name = update.effective_user.full_name or "usuária"
 
     try:
         listas_info = await asyncio.to_thread(task_service.get_user_lists, chat_id)
@@ -111,7 +111,7 @@ async def cb_approve_capture(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     chat_id = update.effective_chat.id
-    user_name = update.effective_user.full_name or "Jamile"
+    user_name = update.effective_user.full_name or "usuária"
 
     try:
         saved = await asyncio.to_thread(
@@ -194,7 +194,7 @@ async def cb_adj_task(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     else:
         # Todas as tarefas revisadas — salvar agora
         chat_id = update.effective_chat.id
-        user_name = update.effective_user.full_name or "Jamile"
+        user_name = update.effective_user.full_name or "usuária"
         try:
             saved = await asyncio.to_thread(
                 task_service.save_classified_tasks,

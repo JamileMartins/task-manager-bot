@@ -19,6 +19,7 @@ from src.services.task_service import (
     get_task_with_list,
     mark_reminder_sent,
     reschedule_task,
+    reset_waiting_since,
     unblock_task,
 )
 from src.utils.keyboards import (
@@ -322,7 +323,10 @@ async def cb_rev_wait_seguir(update: Update, context: ContextTypes.DEFAULT_TYPE)
     msg = update.effective_message
     if not msg:
         return
-    await update.callback_query.answer()
+    query = update.callback_query
+    task_id = query.data.split(":", 1)[1]
+    reset_waiting_since(task_id)
+    await query.answer()
     await msg.edit_reply_markup(None)
     chat_id = update.effective_chat.id
     _advance_wait(context, chat_id)

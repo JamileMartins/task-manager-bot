@@ -44,7 +44,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
     if not msg:
         return
-    name = (update.effective_user.full_name if update.effective_user else None) or "Jamile"
+    name = (update.effective_user.full_name if update.effective_user else None) or "usuária"
     await asyncio.to_thread(task_service.get_or_create_user, update.effective_chat.id, name)
     await msg.reply_text(textos.MSG_BOAS_VINDAS)
 

@@ -2,7 +2,7 @@
 
 > Versão 1.0 — MVP
 > Formato: "Como [persona], quero [ação], para [benefício]."
-> Persona única: **Jamile** (usuária com TDAH).
+> Persona única: **usuária** (com TDAH).
 > Cada história tem critérios de aceitação (CA) testáveis e referência ao RF do PRD.
 
 ---
@@ -11,7 +11,7 @@
 
 ### US-01 — Capturar uma tarefa em texto livre
 
-**Como** Jamile, **quero** enviar uma mensagem comum e que ela vire uma tarefa, **para** registrar sem pensar em comandos.
+**Como** a usuária, **quero** enviar uma mensagem comum e que ela vire uma tarefa, **para** registrar sem pensar em comandos.
 
 - Refs: RF01
 - **CA:**
@@ -22,7 +22,7 @@
 
 ### US-02 — Brain dump com várias tarefas
 
-**Como** Jamile, **quero** despejar várias coisas numa mensagem só, **para** esvaziar a cabeça rapidamente.
+**Como** a usuária, **quero** despejar várias coisas numa mensagem só, **para** esvaziar a cabeça rapidamente.
 
 - Refs: RF02, RF03
 - **CA:**
@@ -33,7 +33,7 @@
 
 ### US-03 — Aprovar captura em bloco
 
-**Como** Jamile, **quero** aprovar tudo de uma vez, **para** não tomar muitas microdecisões.
+**Como** a usuária, **quero** aprovar tudo de uma vez, **para** não tomar muitas microdecisões.
 
 - Refs: RF04
 - **CA:**
@@ -44,7 +44,7 @@
 
 ### US-04 — Triagem da Inbox
 
-**Como** Jamile, **quero** ver itens que a IA não classificou com confiança, **para** organizá-los quando puder.
+**Como** a usuária, **quero** ver itens que a IA não classificou com confiança, **para** organizá-los quando puder.
 
 - Refs: RF03 (fallback)
 - **CA:**
@@ -58,7 +58,7 @@
 
 ### US-05 — Ver listas e suas tarefas
 
-**Como** Jamile, **quero** ver minhas listas e abrir uma, **para** focar numa área de vida por vez.
+**Como** a usuária, **quero** ver minhas listas e abrir uma, **para** focar numa área de vida por vez.
 
 - Refs: RF06
 - **CA:**
@@ -68,7 +68,7 @@
 
 ### US-06 — Criar, renomear e arquivar listas
 
-**Como** Jamile, **quero** personalizar minhas listas, **para** adaptá-las à minha vida.
+**Como** a usuária, **quero** personalizar minhas listas, **para** adaptá-las à minha vida.
 
 - Refs: RF05
 - **CA:**
@@ -79,7 +79,7 @@
 
 ### US-07 — Mover tarefa entre listas
 
-**Como** Jamile, **quero** mudar a lista de uma tarefa, **para** corrigir uma classificação.
+**Como** a usuária, **quero** mudar a lista de uma tarefa, **para** corrigir uma classificação.
 
 - Refs: RF08
 - **CA:**
@@ -93,7 +93,7 @@
 
 ### US-08 — Quadrante sugerido pela IA
 
-**Como** Jamile, **quero** que o sistema sugira o quadrante, **para** não travar na priorização.
+**Como** a usuária, **quero** que o sistema sugira o quadrante, **para** não travar na priorização.
 
 - Refs: RF09
 - **CA:**
@@ -103,7 +103,7 @@
 
 ### US-09 — Definir prazo
 
-**Como** Jamile, **quero** colocar uma data/hora, **para** não perder compromissos.
+**Como** a usuária, **quero** colocar uma data/hora, **para** não perder compromissos.
 
 - Refs: RF10, RF20
 - **CA:**
@@ -113,7 +113,7 @@
 
 ### US-10 — Estimativa de tempo e energia
 
-**Como** Jamile, **quero** marcar quanto tempo e energia uma tarefa pede, **para** casar com meu estado.
+**Como** a usuária, **quero** marcar quanto tempo e energia uma tarefa pede, **para** casar com meu estado.
 
 - Refs: RF12
 - **CA:**
@@ -123,7 +123,7 @@
 
 ### US-11 — Ordenação manual
 
-**Como** Jamile, **quero** reordenar tarefas dentro de uma lista, **para** definir minha sequência.
+**Como** a usuária, **quero** reordenar tarefas dentro de uma lista, **para** definir minha sequência.
 
 - Refs: RF06
 - **CA:**
@@ -137,7 +137,7 @@
 
 ### US-12 — "O que faço agora"
 
-**Como** Jamile, **quero** que o bot escolha UMA tarefa para mim, **para** vencer a paralisia.
+**Como** a usuária, **quero** que o bot escolha UMA tarefa para mim, **para** vencer a paralisia.
 
 - Refs: RF13
 - **CA:**
@@ -149,7 +149,7 @@
 
 ### US-13 — Concluir tarefa
 
-**Como** Jamile, **quero** marcar como feita com um toque, **para** sentir progresso.
+**Como** a usuária, **quero** marcar como feita com um toque, **para** sentir progresso.
 
 - Refs: RF07
 - **CA:**
@@ -159,7 +159,7 @@
 
 ### US-14 — Adiar tarefa
 
-**Como** Jamile, **quero** empurrar uma tarefa para depois, **para** tirá-la da frente sem perdê-la.
+**Como** a usuária, **quero** empurrar uma tarefa para depois, **para** tirá-la da frente sem perdê-la.
 
 - Refs: RF19
 - **CA:**
@@ -173,7 +173,7 @@
 
 ### US-15 — Resumo diário matinal
 
-**Como** Jamile, **quero** receber meus focos de manhã, **para** começar o dia orientada.
+**Como** a usuária, **quero** receber meus focos de manhã, **para** começar o dia orientada.
 
 - Refs: RF14
 - **CA:**
@@ -183,7 +183,7 @@
 
 ### US-16 — Revisão semanal
 
-**Como** Jamile, **quero** revisar o que está parado, **para** não acumular um cemitério de tarefas.
+**Como** a usuária, **quero** revisar o que está parado, **para** não acumular um cemitério de tarefas.
 
 - Refs: RF15
 - **CA:**
@@ -194,7 +194,7 @@
 
 ### US-17 — Lembretes por horário
 
-**Como** Jamile, **quero** ser lembrada de tarefas com hora marcada, **para** não esquecer.
+**Como** a usuária, **quero** ser lembrada de tarefas com hora marcada, **para** não esquecer.
 
 - Refs: RF17
 - **CA:**
@@ -204,7 +204,7 @@
 
 ### US-18 — Recorrência
 
-**Como** Jamile, **quero** tarefas que se repetem, **para** não recriar rotinas (remédio, contas).
+**Como** a usuária, **quero** tarefas que se repetem, **para** não recriar rotinas (remédio, contas).
 
 - Refs: RF11
 - **CA:**
@@ -218,7 +218,7 @@
 
 ### US-19 — Exportar tarefas de casal para grupo
 
-**Como** Jamile, **quero** enviar a lista de casa-casal a um grupo, **para** combinar com meu parceiro.
+**Como** a usuária, **quero** enviar a lista de casa-casal a um grupo, **para** combinar com meu parceiro.
 
 - Refs: RF16
 - **CA:**
@@ -229,7 +229,7 @@
 
 ### US-20 — Configurações
 
-**Como** Jamile, **quero** ajustar horários e fuso, **para** o bot se encaixar na minha rotina.
+**Como** a usuária, **quero** ajustar horários e fuso, **para** o bot se encaixar na minha rotina.
 
 - Refs: RF (config)
 - **CA:**
@@ -239,7 +239,7 @@
 
 ### US-21 — Acesso restrito
 
-**Como** Jamile, **quero** que só eu use o bot, **para** manter privacidade.
+**Como** a usuária, **quero** que só eu use o bot, **para** manter privacidade.
 
 - Refs: RNF10
 - **CA:**
@@ -249,7 +249,7 @@
 
 ### US-22 — Buscar tarefas
 
-**Como** Jamile, **quero** buscar por palavra, **para** achar algo rápido.
+**Como** a usuária, **quero** buscar por palavra, **para** achar algo rápido.
 
 - Refs: RF18
 - **CA:**
@@ -262,7 +262,7 @@
 
 ### US-23 — Registrar impedimento de uma tarefa
 
-**Como** Jamile, **quero** dizer o que está me impedindo numa tarefa, **para** transformar um bloqueio invisível em algo acionável.
+**Como** a usuária, **quero** dizer o que está me impedindo numa tarefa, **para** transformar um bloqueio invisível em algo acionável.
 
 - Refs: RF21, RF22
 - **CA:**
@@ -273,7 +273,7 @@
 
 ### US-24 — Menor próximo passo automático
 
-**Como** Jamile, **quero** que o bot quebre uma tarefa grande no menor passo possível, **para** vencer a paralisia de início.
+**Como** a usuária, **quero** que o bot quebre uma tarefa grande no menor passo possível, **para** vencer a paralisia de início.
 
 - Refs: RF23
 - **CA:**
@@ -284,7 +284,7 @@
 
 ### US-25 — Dependência de pessoa (aguardando ou cobrança)
 
-**Como** Jamile, **quero** escolher o que fazer quando dependo de alguém, **para** tirar a tarefa do meu radar sem perdê-la.
+**Como** a usuária, **quero** escolher o que fazer quando dependo de alguém, **para** tirar a tarefa do meu radar sem perdê-la.
 
 - Refs: RF25, RF27
 - **CA:**
@@ -295,7 +295,7 @@
 
 ### US-26 — Decisão pendente e recurso faltante
 
-**Como** Jamile, **quero** que o bot crie a ação certa quando falta decidir ou obter algo, **para** atacar a causa real do bloqueio.
+**Como** a usuária, **quero** que o bot crie a ação certa quando falta decidir ou obter algo, **para** atacar a causa real do bloqueio.
 
 - Refs: RF24, RF26
 - **CA:**
@@ -305,7 +305,7 @@
 
 ### US-27 — Detectar impedimento na captura
 
-**Como** Jamile, **quero** que o bot perceba dependências já quando anoto, **para** a tarefa não aparecer como pronta quando não está.
+**Como** a usuária, **quero** que o bot perceba dependências já quando anoto, **para** a tarefa não aparecer como pronta quando não está.
 
 - Refs: RF28
 - **CA:**
@@ -315,7 +315,7 @@
 
 ### US-28 — Resolver/desbloquear impedimento
 
-**Como** Jamile, **quero** marcar um impedimento como resolvido, **para** a tarefa voltar a ficar disponível.
+**Como** a usuária, **quero** marcar um impedimento como resolvido, **para** a tarefa voltar a ficar disponível.
 
 - Refs: RF29
 - **CA:**
@@ -326,7 +326,7 @@
 
 ### US-29 — Revisar esperas longas
 
-**Como** Jamile, **quero** revisar o que estou esperando há muito tempo, **para** não acumular um "cemitério de esperas".
+**Como** a usuária, **quero** revisar o que estou esperando há muito tempo, **para** não acumular um "cemitério de esperas".
 
 - Refs: RF30
 - **CA:**
@@ -346,4 +346,4 @@
 | F2 | US-02, US-03, US-04 | ✅ Completa |
 | F3 | US-07, US-08, US-09, US-10, US-11, US-12 | ✅ Completa |
 | F4 | US-14, US-15, US-16, US-17, US-18, US-20, US-23, US-24, US-25, US-26, US-27, US-28, US-29 | ✅ Completa |
-| F5 | US-19, US-22 | ❌ Pendentes |
+| F5 | US-19, US-22 | ✅ Completa |

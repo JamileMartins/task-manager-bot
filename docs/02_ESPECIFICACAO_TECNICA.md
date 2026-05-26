@@ -278,7 +278,7 @@ foco-bot/
 TELEGRAM_BOT_TOKEN=
 ANTHROPIC_API_KEY=
 DATABASE_URL=postgresql+psycopg://user:pass@host:5432/dbname
-AUTHORIZED_CHAT_ID=          # chat_id da Jamile (RNF10)
+AUTHORIZED_CHAT_ID=          # chat_id da usuária (RNF10)
 DEFAULT_TIMEZONE=America/Fortaleza
 ANTHROPIC_MODEL=claude-sonnet-4-20250514
 ```
