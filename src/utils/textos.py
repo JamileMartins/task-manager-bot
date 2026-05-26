@@ -577,27 +577,64 @@ MSG_MED_VAZIA = (
 )
 
 MSG_MED_PEDIR_NOME = "Qual o nome da medicação?"
+MSG_MED_PEDIR_HORARIO = (
+    "Qual o horário aproximado para tomar?\n"
+    "Ex: 08:00\n\n"
+    "Ou toque em Pular."
+)
 MSG_MED_PEDIR_FREQ = "Com que frequência você toma?"
+MSG_MED_PEDIR_DIA = "Qual dia da semana?"
+
+_DOW_NOME = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
 
 
-def msg_medicacoes(daily: list, weekly: list) -> str:
+def _dow_nome(recurrence: str) -> str:
+    """Retorna o nome do dia da semana a partir de 'weekly:N'."""
+    parts = recurrence.split(":")
+    if len(parts) == 2:
+        try:
+            return _DOW_NOME[int(parts[1])]
+        except (ValueError, IndexError):
+            pass
+    return ""
+
+
+def msg_medicacoes(daily: list, weekly: list, completed_hoje: list | None = None) -> str:
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo("America/Fortaleza")
+
     lines = ["💊 Medicações\n"]
     if daily:
         lines.append(f"📅 Hoje ({len(daily)})")
         for t in daily:
-            lines.append(f"  • {t.title}")
+            horario = f"  ⏰ {t.notes}" if t.notes else ""
+            lines.append(f"  • {t.title}{horario}")
     if weekly:
         if daily:
             lines.append("")
         lines.append(f"📆 Semanal ({len(weekly)})")
         for t in weekly:
-            lines.append(f"  • {t.title}")
+            dia = f" — {_dow_nome(t.recurrence or '')}" if t.recurrence and ":" in t.recurrence else ""
+            horario = f"  ⏰ {t.notes}" if t.notes else ""
+            lines.append(f"  • {t.title}{dia}{horario}")
+    if completed_hoje:
+        lines.append("")
+        lines.append("✅ Tomadas hoje:")
+        for t in completed_hoje:
+            hora = t.completed_at.astimezone(tz).strftime("%H:%M")
+            lines.append(f"  • {t.title} — {hora}")
     return "\n".join(lines)
 
 
-def msg_med_ok(title: str, recurrence: str) -> str:
-    freq = "diária" if recurrence == "daily" else "semanal"
-    return f"{title} adicionada ({freq}) ✅\nAparece no /medicacoes a partir de hoje."
+def msg_med_ok(title: str, recurrence: str, med_time: str | None = None, dow: int | None = None) -> str:
+    if recurrence == "daily":
+        freq = "diária"
+    elif dow is not None:
+        freq = f"semanal — {_DOW_NOME[dow]}"
+    else:
+        freq = "semanal"
+    horario = f" às {med_time}" if med_time else ""
+    return f"{title} adicionada ({freq}{horario}) ✅\nAparece no /medicacoes a partir de hoje."
 
 
 # ---------------------------------------------------------------------------

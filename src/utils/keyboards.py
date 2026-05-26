@@ -132,6 +132,23 @@ def kb_med_freq() -> InlineKeyboardMarkup:
     ]])
 
 
+def kb_med_pular() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("Pular", callback_data="med_pular"),
+    ]])
+
+
+def kb_med_dow() -> InlineKeyboardMarkup:
+    days = [
+        ("Seg", 0), ("Ter", 1), ("Qua", 2), ("Qui", 3),
+        ("Sex", 4), ("Sáb", 5), ("Dom", 6),
+    ]
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(label, callback_data=f"med_dow:{i}") for label, i in days[:4]],
+        [InlineKeyboardButton(label, callback_data=f"med_dow:{i}") for label, i in days[4:]],
+    ])
+
+
 def kb_tudo_group(tasks: Sequence[Task]) -> InlineKeyboardMarkup:
     """Keyboard para um grupo do /tudo — ✅ apenas para tarefas abertas; ⏳ sem botão para aguardando."""
     rows = []

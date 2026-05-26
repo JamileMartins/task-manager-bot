@@ -7,6 +7,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
@@ -156,6 +157,14 @@ _RECURRENCE_DELTA: dict[str, timedelta] = {
 }
 
 
+def _recurrence_delta(recurrence: str) -> timedelta | None:
+    if recurrence in _RECURRENCE_DELTA:
+        return _RECURRENCE_DELTA[recurrence]
+    if recurrence.startswith("weekly:"):
+        return timedelta(weeks=1)
+    return None
+
+
 def complete_task(task_id: str | uuid.UUID) -> bool:
     uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
     with get_session() as session:
@@ -167,8 +176,8 @@ def complete_task(task_id: str | uuid.UUID) -> bool:
         task.completed_at = now
         task.last_touched_at = now
 
-        if task.recurrence and task.recurrence in _RECURRENCE_DELTA:
-            delta = _RECURRENCE_DELTA[task.recurrence]
+        if task.recurrence and _recurrence_delta(task.recurrence) is not None:
+            delta = _recurrence_delta(task.recurrence)
             base = task.due_at if task.due_at else now
             next_due = base + delta
             next_task = Task(
@@ -324,12 +333,12 @@ def search_tasks(chat_id: int, term: str) -> list[Task]:
         ).all())
 
 
-def get_medicacoes(chat_id: int) -> tuple[list[Task], list[Task]]:
-    """Retorna (daily, weekly) das medicações abertas da lista Saúde (US-32)."""
+def get_medicacoes(chat_id: int) -> tuple[list[Task], list[Task], list[Task]]:
+    """Retorna (daily_abertas, weekly_abertas, concluidas_hoje) da lista Saúde."""
     with get_session() as session:
         user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
         if user is None:
-            return [], []
+            return [], [], []
         saude = session.scalar(
             select(TaskList).where(
                 TaskList.user_id == user.id,
@@ -338,7 +347,7 @@ def get_medicacoes(chat_id: int) -> tuple[list[Task], list[Task]]:
             )
         )
         if saude is None:
-            return [], []
+            return [], [], []
         daily = list(session.scalars(
             select(Task)
             .where(Task.list_id == saude.id, Task.recurrence == "daily", Task.status == "aberta")
@@ -346,14 +355,29 @@ def get_medicacoes(chat_id: int) -> tuple[list[Task], list[Task]]:
         ).all())
         weekly = list(session.scalars(
             select(Task)
-            .where(Task.list_id == saude.id, Task.recurrence == "weekly", Task.status == "aberta")
+            .where(
+                Task.list_id == saude.id,
+                Task.recurrence.like("weekly%"),
+                Task.status == "aberta",
+            )
             .order_by(Task.sort_order, Task.created_at)
         ).all())
-        return daily, weekly
+        tz = ZoneInfo("America/Fortaleza")
+        today_start = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        completed_today = list(session.scalars(
+            select(Task)
+            .where(
+                Task.list_id == saude.id,
+                Task.status == "concluida",
+                Task.completed_at >= today_start,
+            )
+            .order_by(Task.completed_at.desc())
+        ).all())
+        return daily, weekly, completed_today
 
 
-def create_medicacao(chat_id: int, title: str, recurrence: str) -> Task:
-    """Cria uma medicação na lista Saúde com recorrência (US-32)."""
+def create_medicacao(chat_id: int, title: str, recurrence: str, med_time: str | None = None) -> Task:
+    """Cria uma medicação na lista Saúde com recorrência e horário opcional (US-32)."""
     with get_session() as session:
         user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
         if user is None:
@@ -380,6 +404,7 @@ def create_medicacao(chat_id: int, title: str, recurrence: str) -> Task:
             user_id=user.id,
             list_id=saude.id,
             title=title,
+            notes=med_time,
             recurrence=recurrence,
             due_at=now,
             status="aberta",
