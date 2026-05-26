@@ -874,6 +874,33 @@ def get_daily_summary_tasks(chat_id: int) -> tuple[list[Task], list[Task]]:
         return today_tasks, focus_tasks
 
 
+def get_tomorrow_tasks(chat_id: int) -> list[Task]:
+    """Tarefas abertas com prazo no dia de amanhã."""
+    import pytz
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return []
+
+        tz = pytz.timezone(user.timezone or "America/Fortaleza")
+        now_local = datetime.now(tz)
+        tomorrow = now_local + timedelta(days=1)
+        day_start = tomorrow.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = tomorrow.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        return list(session.scalars(
+            select(Task)
+            .options(selectinload(Task.task_list))
+            .where(
+                Task.user_id == user.id,
+                Task.status == "aberta",
+                Task.due_at >= day_start,
+                Task.due_at <= day_end,
+            )
+            .order_by(Task.due_at, Task.quadrant.nullslast(), Task.sort_order)
+        ).all())
+
+
 def get_stale_tasks(chat_id: int) -> list[Task]:
     """Tarefas abertas não tocadas há mais de stale_days dias."""
     with get_session() as session:

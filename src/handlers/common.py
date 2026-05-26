@@ -121,6 +121,52 @@ async def cmd_ping(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 # ---------------------------------------------------------------------------
+# /hoje e /amanha
+# ---------------------------------------------------------------------------
+
+async def cmd_hoje(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_authorized(update):
+        await deny_unauthorized(update)
+        return
+    msg = update.effective_message
+    if not msg:
+        return
+    try:
+        await msg.reply_chat_action(ChatAction.TYPING)
+        chat_id = update.effective_chat.id
+        today_tasks, focus_tasks = await asyncio.to_thread(
+            task_service.get_daily_summary_tasks, chat_id
+        )
+        if not today_tasks and not focus_tasks:
+            await msg.reply_text(textos.MSG_HOJE_VAZIO)
+        else:
+            await msg.reply_text(textos.msg_hoje(today_tasks, focus_tasks))
+    except Exception:
+        logger.exception("Erro em /hoje")
+        await msg.reply_text(textos.MSG_ERRO_GENERICO)
+
+
+async def cmd_amanha(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_authorized(update):
+        await deny_unauthorized(update)
+        return
+    msg = update.effective_message
+    if not msg:
+        return
+    try:
+        await msg.reply_chat_action(ChatAction.TYPING)
+        chat_id = update.effective_chat.id
+        tasks = await asyncio.to_thread(task_service.get_tomorrow_tasks, chat_id)
+        if not tasks:
+            await msg.reply_text(textos.MSG_AMANHA_VAZIO)
+        else:
+            await msg.reply_text(textos.msg_amanha(tasks))
+    except Exception:
+        logger.exception("Erro em /amanha")
+        await msg.reply_text(textos.MSG_ERRO_GENERICO)
+
+
+# ---------------------------------------------------------------------------
 # /reiniciar
 # ---------------------------------------------------------------------------
 

@@ -471,6 +471,84 @@ def test_msg_busca_aguardando_mostra_icone():
 
 
 # ---------------------------------------------------------------------------
+# /hoje e /amanha
+# ---------------------------------------------------------------------------
+
+def _mock_task_due(title, due_str=None, estimate_min=None, task_list=None):
+    from datetime import datetime, timezone
+    due = datetime.fromisoformat(due_str).replace(tzinfo=timezone.utc) if due_str else None
+    return SimpleNamespace(
+        title=title,
+        due_at=due,
+        estimate_min=estimate_min,
+        task_list=task_list,
+        quadrant=None,
+    )
+
+
+def test_msg_hoje_exibe_tarefas_com_prazo():
+    t = _mock_task_due("Ligar pro dentista", "2026-05-26T12:00:00-03:00", estimate_min=15)
+    resultado = textos.msg_hoje([t], [])
+    assert "Ligar pro dentista" in resultado
+    assert "Com prazo" in resultado
+    assert "15min" in resultado
+
+
+def test_msg_hoje_exibe_focos():
+    t = _mock_task_due("Estudar para prova", estimate_min=60)
+    resultado = textos.msg_hoje([], [t])
+    assert "Estudar para prova" in resultado
+    assert "Q1/Q2" in resultado
+
+
+def test_msg_hoje_menciona_agora():
+    resultado = textos.msg_hoje([], [_mock_task_due("T")])
+    assert "/agora" in resultado
+
+
+def test_msg_hoje_vazia_nao_e_chamada_aqui():
+    assert textos.MSG_HOJE_VAZIO.strip() != ""
+    assert "/agora" in textos.MSG_HOJE_VAZIO
+
+
+def test_msg_amanha_exibe_tarefas():
+    t = _mock_task_due("Reunião", "2026-05-27T14:00:00-03:00", estimate_min=60)
+    resultado = textos.msg_amanha([t])
+    assert "Reunião" in resultado
+    assert "Amanhã" in resultado
+    assert "60min" in resultado
+
+
+def test_msg_amanha_singular():
+    t = _mock_task_due("Única")
+    resultado = textos.msg_amanha([t])
+    assert "1 tarefa" in resultado
+
+
+def test_msg_amanha_plural():
+    tasks = [_mock_task_due(f"T{i}") for i in range(3)]
+    resultado = textos.msg_amanha(tasks)
+    assert "3 tarefas" in resultado
+
+
+def test_msg_amanha_exibe_lista():
+    lista = SimpleNamespace(name="Trabalho")
+    t = _mock_task_due("Entregar relatório", task_list=lista)
+    resultado = textos.msg_amanha([t])
+    assert "Trabalho" in resultado
+
+
+def test_msg_amanha_vazio_nao_e_vazia():
+    assert textos.MSG_AMANHA_VAZIO.strip() != ""
+
+
+@pytest.mark.parametrize("constante", ["MSG_HOJE_VAZIO", "MSG_AMANHA_VAZIO"])
+def test_constantes_hoje_amanha_nao_vazias(constante):
+    valor = getattr(textos, constante)
+    assert isinstance(valor, str) and valor.strip() != ""
+
+
+# ---------------------------------------------------------------------------
 # Versão
 # ---------------------------------------------------------------------------
 

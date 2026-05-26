@@ -38,7 +38,8 @@ MSG_AJUDA = (
     "📨 /inbox — o que ainda não organizei direito\n"
     "🗂️ /tudo — todas as tarefas abertas de uma vez\n"
     "💊 /medicacoes — checklist de medicações do dia/semana\n"
-    "☀️ /hoje — seus focos de hoje\n"
+    "☀️ /hoje — seus focos e prazos de hoje\n"
+    "🌙 /amanha — o que tem prazo para amanhã\n"
     "👫 /casal — mandar as tarefas de casa pro grupo\n"
     "🔍 /buscar <palavra> — achar uma tarefa\n"
     "⚙️ /config — horários e ajustes\n\n"
@@ -445,6 +446,16 @@ MSG_DIARIO_VAZIO = (
     "ou pra descansar, que também conta."
 )
 
+MSG_HOJE_VAZIO = (
+    "Nenhuma tarefa com prazo para hoje ☀️\n"
+    "Dia livre! Se quiser uma sugestão, é só /agora."
+)
+
+MSG_AMANHA_VAZIO = (
+    "Nenhuma tarefa com prazo para amanhã 🌙\n"
+    "Amanhã está livre por enquanto."
+)
+
 
 def msg_diario_focos(today_tasks: list, focus_tasks: list) -> str:
     lines = ["Bom dia ☀️\n", "Sem pressão — só os destaques de hoje:\n"]
@@ -455,6 +466,40 @@ def msg_diario_focos(today_tasks: list, focus_tasks: list) -> str:
         est = f" · {t.estimate_min}min" if t.estimate_min else ""
         lines.append(f"🎯 {t.title}{est}")
     lines.append("\nSe bater dúvida do que fazer, é só /agora que eu escolho por você.")
+    return "\n".join(lines)
+
+
+def msg_hoje(today_tasks: list, focus_tasks: list) -> str:
+    import pytz
+    tz = pytz.timezone("America/Fortaleza")
+    lines = ["☀️ Hoje\n"]
+    if today_tasks:
+        lines.append(f"📅 Com prazo ({len(today_tasks)}):")
+        for t in today_tasks:
+            hora = f" · {t.due_at.astimezone(tz).strftime('%H:%M')}" if t.due_at else ""
+            est = f" · {t.estimate_min}min" if t.estimate_min else ""
+            lines.append(f"  • {t.title}{hora}{est}")
+    if focus_tasks:
+        if today_tasks:
+            lines.append("")
+        lines.append(f"🎯 Focos Q1/Q2 ({len(focus_tasks)}):")
+        for t in focus_tasks:
+            est = f" · {t.estimate_min}min" if t.estimate_min else ""
+            lines.append(f"  • {t.title}{est}")
+    lines.append("\n/agora — eu escolho UMA pra você começar.")
+    return "\n".join(lines)
+
+
+def msg_amanha(tasks: list) -> str:
+    import pytz
+    tz = pytz.timezone("America/Fortaleza")
+    s = "" if len(tasks) == 1 else "s"
+    lines = [f"🌙 Amanhã — {len(tasks)} tarefa{s} com prazo\n"]
+    for t in tasks:
+        hora = f" · {t.due_at.astimezone(tz).strftime('%H:%M')}" if t.due_at else ""
+        est = f" · {t.estimate_min}min" if t.estimate_min else ""
+        lista = f" [{t.task_list.name}]" if t.task_list else ""
+        lines.append(f"  • {t.title}{hora}{est}{lista}")
     return "\n".join(lines)
 
 

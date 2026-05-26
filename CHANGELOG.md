@@ -7,6 +7,17 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não lançado]
 
+## [1.9.0] — 2026-05-26 — /hoje e /amanhã
+
+### Adicionado
+
+- **`/hoje`** — exibe prazos do dia e até 3 focos Q1/Q2, com hora e estimativa. Comando que já estava no `/ajuda` mas sem handler implementado.
+- **`/amanha`** — lista tarefas com prazo no dia seguinte, ordenadas por hora, com lista e estimativa.
+- `task_service.get_tomorrow_tasks()` — query para o janela de amanhã no fuso da usuária.
+- Novas mensagens `MSG_HOJE_VAZIO` e `MSG_AMANHA_VAZIO` com tom acolhedor.
+
+---
+
 ## [1.8.0] — 2026-05-26 — Transcrição de áudio via Gemini
 
 ### Adicionado
