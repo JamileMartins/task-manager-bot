@@ -112,6 +112,26 @@ def kb_ajustar_tarefa(
     return InlineKeyboardMarkup(rows)
 
 
+def kb_medicacoes(daily: Sequence[Task], weekly: Sequence[Task]) -> InlineKeyboardMarkup:
+    """Checklist de medicações com ✅ por item e botão de nova medicação."""
+    rows = []
+    for task in list(daily) + list(weekly):
+        title = task.title[:28] + "…" if len(task.title) > 28 else task.title
+        rows.append([
+            InlineKeyboardButton(title, callback_data=f"task_dt:{task.id}"),
+            InlineKeyboardButton("✅", callback_data=f"complete_task:{task.id}"),
+        ])
+    rows.append([InlineKeyboardButton("➕ Nova medicação", callback_data="med_nova")])
+    return InlineKeyboardMarkup(rows)
+
+
+def kb_med_freq() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("📅 Diária", callback_data="med_freq:daily"),
+        InlineKeyboardButton("📆 Semanal", callback_data="med_freq:weekly"),
+    ]])
+
+
 def kb_tudo_group(tasks: Sequence[Task]) -> InlineKeyboardMarkup:
     """Keyboard para um grupo do /tudo — ✅ apenas para tarefas abertas; ⏳ sem botão para aguardando."""
     rows = []

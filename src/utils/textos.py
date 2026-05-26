@@ -35,6 +35,7 @@ MSG_AJUDA = (
     "📂 /ver <lista> — abrir uma lista\n"
     "📨 /inbox — o que ainda não organizei direito\n"
     "🗂️ /tudo — todas as tarefas abertas de uma vez\n"
+    "💊 /medicacoes — checklist de medicações do dia/semana\n"
     "☀️ /hoje — seus focos de hoje\n"
     "👫 /casal — mandar as tarefas de casa pro grupo\n"
     "🔍 /buscar <palavra> — achar uma tarefa\n"
@@ -564,6 +565,39 @@ def msg_busca(tasks: list, term: str) -> str:
         status_icon = "⏳" if t.status == "aguardando" else "◾"
         lines.append(f"{status_icon} {t.title}\n   → {lista}")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# /medicacoes (US-32)
+# ---------------------------------------------------------------------------
+
+MSG_MED_VAZIA = (
+    "Nenhuma medicação cadastrada ainda 💊\n\n"
+    "Toque em ➕ Nova medicação para adicionar a primeira."
+)
+
+MSG_MED_PEDIR_NOME = "Qual o nome da medicação?"
+MSG_MED_PEDIR_FREQ = "Com que frequência você toma?"
+
+
+def msg_medicacoes(daily: list, weekly: list) -> str:
+    lines = ["💊 Medicações\n"]
+    if daily:
+        lines.append(f"📅 Hoje ({len(daily)})")
+        for t in daily:
+            lines.append(f"  • {t.title}")
+    if weekly:
+        if daily:
+            lines.append("")
+        lines.append(f"📆 Semanal ({len(weekly)})")
+        for t in weekly:
+            lines.append(f"  • {t.title}")
+    return "\n".join(lines)
+
+
+def msg_med_ok(title: str, recurrence: str) -> str:
+    freq = "diária" if recurrence == "daily" else "semanal"
+    return f"{title} adicionada ({freq}) ✅\nAparece no /medicacoes a partir de hoje."
 
 
 # ---------------------------------------------------------------------------

@@ -324,6 +324,74 @@ def search_tasks(chat_id: int, term: str) -> list[Task]:
         ).all())
 
 
+def get_medicacoes(chat_id: int) -> tuple[list[Task], list[Task]]:
+    """Retorna (daily, weekly) das medicações abertas da lista Saúde (US-32)."""
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return [], []
+        saude = session.scalar(
+            select(TaskList).where(
+                TaskList.user_id == user.id,
+                TaskList.slug == "saude",
+                TaskList.archived.is_(False),
+            )
+        )
+        if saude is None:
+            return [], []
+        daily = list(session.scalars(
+            select(Task)
+            .where(Task.list_id == saude.id, Task.recurrence == "daily", Task.status == "aberta")
+            .order_by(Task.sort_order, Task.created_at)
+        ).all())
+        weekly = list(session.scalars(
+            select(Task)
+            .where(Task.list_id == saude.id, Task.recurrence == "weekly", Task.status == "aberta")
+            .order_by(Task.sort_order, Task.created_at)
+        ).all())
+        return daily, weekly
+
+
+def create_medicacao(chat_id: int, title: str, recurrence: str) -> Task:
+    """Cria uma medicação na lista Saúde com recorrência (US-32)."""
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            raise ValueError("Usuário não encontrado")
+        saude = session.scalar(
+            select(TaskList).where(
+                TaskList.user_id == user.id,
+                TaskList.slug == "saude",
+                TaskList.archived.is_(False),
+            )
+        )
+        if saude is None:
+            saude = TaskList(
+                user_id=user.id,
+                name="Saúde",
+                slug="saude",
+                is_couple=False,
+                sort_order=4,
+            )
+            session.add(saude)
+            session.flush()
+        now = _now()
+        task = Task(
+            user_id=user.id,
+            list_id=saude.id,
+            title=title,
+            recurrence=recurrence,
+            due_at=now,
+            status="aberta",
+            sort_order=0,
+            created_at=now,
+            last_touched_at=now,
+        )
+        session.add(task)
+        session.flush()
+        return task
+
+
 def get_all_open_tasks(chat_id: int) -> list[TaskGroup]:
     """Retorna todas as tarefas abertas/aguardando agrupadas por lista (Inbox primeiro)."""
     with get_session() as session:

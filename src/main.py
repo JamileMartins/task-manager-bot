@@ -90,6 +90,7 @@ from src.handlers.lists import (
     cmd_listas,
     list_conversation,
 )
+from src.handlers.medicacoes import cmd_medicacoes, medicacoes_conversation
 from src.handlers.task_detail import (
     cb_task_detail,
     cb_task_move_to,
@@ -139,9 +140,11 @@ def main() -> None:
     app.add_handler(CommandHandler("buscar", cmd_buscar))
     app.add_handler(CommandHandler("setgrupo", cmd_setgrupo))
     app.add_handler(CommandHandler("tudo", cmd_tudo))
+    app.add_handler(CommandHandler("medicacoes", cmd_medicacoes))
 
-    # ConversationHandler de listas (antes do capture handler)
+    # ConversationHandlers (antes do capture handler)
     app.add_handler(list_conversation)
+    app.add_handler(medicacoes_conversation)
 
     # Impedimentos
     app.add_handler(CallbackQueryHandler(cb_blocker_start, pattern=r"^blk_start:"))
