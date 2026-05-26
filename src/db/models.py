@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, time
+from datetime import date, datetime, time
 from typing import List, Optional
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Integer,
@@ -74,6 +75,7 @@ class Task(Base):
         Uuid(as_uuid=True), ForeignKey("tasks.id"), nullable=True
     )
     waiting_since: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    due_alerted: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -105,5 +107,7 @@ class Config(Base):
     couple_group_chat_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     stale_days: Mapped[int] = mapped_column(Integer, nullable=False, default=7)
     stale_waiting_days: Mapped[int] = mapped_column(Integer, nullable=False, default=14)
+    energia_do_dia: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
+    energia_do_dia_data: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="config")

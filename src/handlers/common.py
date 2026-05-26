@@ -170,6 +170,25 @@ async def cmd_amanha(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 # /conquistas (Sugestão #3)
 # ---------------------------------------------------------------------------
 
+async def cmd_exportar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_authorized(update):
+        await deny_unauthorized(update)
+        return
+    msg = update.effective_message
+    if not msg:
+        return
+    try:
+        await msg.reply_chat_action(ChatAction.TYPING)
+        groups = await asyncio.to_thread(task_service.get_all_open_tasks, update.effective_chat.id)
+        if not groups:
+            await msg.reply_text(textos.MSG_EXPORTAR_VAZIO)
+        else:
+            await msg.reply_text(textos.msg_exportar(groups))
+    except Exception:
+        logger.exception("Erro em /exportar")
+        await msg.reply_text(textos.MSG_ERRO_GENERICO)
+
+
 async def cmd_conquistas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_authorized(update):
         await deny_unauthorized(update)

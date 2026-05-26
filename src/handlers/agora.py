@@ -41,10 +41,21 @@ async def cb_agora_tempo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
     tempo_min = int(query.data.split(":")[1])
     context.user_data[_TEMPO_KEY] = tempo_min
-    await query.edit_message_text(
-        textos.MSG_AGORA_ENERGIA,
-        reply_markup=keyboards.kb_agora_energia(),
-    )
+
+    from datetime import date
+    cfg = await asyncio.to_thread(task_service.get_config, update.effective_chat.id)
+    if (
+        cfg
+        and cfg.energia_do_dia
+        and cfg.energia_do_dia_data == date.today()
+    ):
+        context.user_data[_ENERGIA_KEY] = cfg.energia_do_dia
+        await _show_agora_task(query, update, context)
+    else:
+        await query.edit_message_text(
+            textos.MSG_AGORA_ENERGIA,
+            reply_markup=keyboards.kb_agora_energia(),
+        )
 
 
 async def cb_agora_energia(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

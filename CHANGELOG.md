@@ -7,6 +7,20 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não lançado]
 
+## [1.14.0] — 2026-05-26 — Energia do dia, prazo vencido, /exportar e /foco
+
+### Adicionado
+
+- **Check-in de energia no resumo matinal (Sugestão #1)** — bom dia envia botões `⚡ Alta / 🔋 Média / 🪫 Baixa`; escolha salva em `config.energia_do_dia`. O `/agora` usa esse valor como padrão durante o dia, pulando a pergunta de energia enquanto a data for a mesma.
+- **Lembrete de prazo vencido (Sugestão #4)** — `send_reminders` detecta tarefas abertas com `due_at` no passado e ainda não alertadas; envia notificação gentil com opções "📅 Adiar 1 dia", "👀 Ver tarefa" e "🗑️ Arquivar". Campo `due_alerted` evita repetição.
+- **`/exportar` (Sugestão #8)** — lista todas as tarefas abertas em texto plano copiável, agrupadas por lista com separador, prazo e símbolo ⏳ para `aguardando`.
+- **`/foco [work] [break]`** — Pomodoro configurável (padrão 50 + 15 min). Agenda timers reais via JobQueue. Notifica ao fim do trabalho com botões descanso/pular; notifica ao fim do descanso com botões novo ciclo/encerrar. `/parar_foco` cancela a sessão ativa a qualquer momento.
+
+### Infraestrutura
+
+- Migration `0002`: colunas `energia_do_dia` e `energia_do_dia_data` em `config`; `due_alerted` em `tasks`.
+- 6 novos testes: energia do dia e prazo vencido. 329 total.
+
 ## [1.13.0] — 2026-05-26 — Subtarefas no detalhe e edição de título
 
 ### Adicionado

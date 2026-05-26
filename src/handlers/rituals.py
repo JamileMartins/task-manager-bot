@@ -1,6 +1,7 @@
 """Rituais: resumo diário (US-15) e revisão semanal (US-16)."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, time, timezone
 
@@ -16,17 +17,22 @@ from src.services.task_service import (
     get_daily_summary_tasks,
     get_due_reminders,
     get_due_waiting_tasks,
+    get_overdue_unalerted_tasks,
     get_stale_tasks,
     get_stale_waiting_tasks,
     get_task_with_list,
+    mark_due_alerted,
     mark_reminder_sent,
     reschedule_task,
     reset_waiting_since,
+    set_energia_do_dia,
     unblock_task,
 )
 from src.utils.keyboards import (
     kb_blocker_cobrar_date,
+    kb_energia_do_dia,
     kb_lembrete,
+    kb_prazo_vencido,
     kb_revisao_abertura,
     kb_revisao_espera,
     kb_revisao_reagendar,
@@ -34,12 +40,15 @@ from src.utils.keyboards import (
 )
 from src.utils.textos import (
     MSG_DIARIO_VAZIO,
+    MSG_ENERGIA_DO_DIA_CHECK,
+    MSG_ENERGIA_DO_DIA_SALVA,
     MSG_REVISAO_ESPERAS_ABERTURA,
     MSG_REVISAO_NADA,
     msg_auto_unblock,
     msg_conquistas_diario,
     msg_diario_focos,
     msg_lembrete,
+    msg_prazo_vencido,
     msg_revisao_abertura,
     msg_revisao_encerramento,
     msg_revisao_espera,
@@ -100,6 +109,24 @@ async def send_reminders(context: ContextTypes.DEFAULT_TYPE) -> None:
         except Exception:
             logger.exception("Erro ao desbloquear tarefa %s por data", task.id)
 
+    try:
+        overdue = get_overdue_unalerted_tasks()
+    except Exception:
+        logger.exception("Erro ao buscar tarefas com prazo vencido")
+        return
+
+    for task, chat_id in overdue:
+        try:
+            mark_due_alerted(task.id)
+            await context.bot.send_message(
+                chat_id,
+                msg_prazo_vencido(task.title),
+                reply_markup=kb_prazo_vencido(task.id),
+                parse_mode="Markdown",
+            )
+        except Exception:
+            logger.exception("Erro ao alertar prazo vencido da tarefa %s", task.id)
+
 
 async def send_daily_summary(context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = context.job.data["chat_id"]
@@ -115,6 +142,11 @@ async def send_daily_summary(context: ContextTypes.DEFAULT_TYPE) -> None:
         text = msg_conquistas_diario(stats["ontem"]) + "\n\n" + text
 
     await context.bot.send_message(chat_id, text)
+    await context.bot.send_message(
+        chat_id,
+        MSG_ENERGIA_DO_DIA_CHECK,
+        reply_markup=kb_energia_do_dia(),
+    )
 
 
 async def send_weekly_review(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -362,6 +394,47 @@ async def cb_rev_wait_seguir(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 # ---------------------------------------------------------------------------
+# Energia do dia (Sugestão #1)
+# ---------------------------------------------------------------------------
+
+async def cb_set_energia_dia(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    from src.handlers.common import is_authorized
+    if not is_authorized(update):
+        return
+    energia = query.data.split(":")[1]
+    await asyncio.to_thread(set_energia_do_dia, update.effective_chat.id, energia)
+    await query.edit_message_text(MSG_ENERGIA_DO_DIA_SALVA)
+
+
+# ---------------------------------------------------------------------------
+# Prazo vencido (Sugestão #4)
+# ---------------------------------------------------------------------------
+
+async def cb_overdue_adiar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    from src.handlers.common import is_authorized
+    if not is_authorized(update):
+        return
+    task_id = query.data.split(":")[1]
+    await asyncio.to_thread(reschedule_task, task_id, 1)
+    await query.edit_message_text("📅 Adiada para amanhã.")
+
+
+async def cb_overdue_arch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    from src.handlers.common import is_authorized
+    if not is_authorized(update):
+        return
+    task_id = query.data.split(":")[1]
+    await asyncio.to_thread(archive_task, task_id)
+    await query.edit_message_text("🗑️ Arquivada.")
+
+
+# ---------------------------------------------------------------------------
 # Job setup
 # ---------------------------------------------------------------------------
 
@@ -400,3 +473,4 @@ def _schedule_weekly(app, chat_id: int, cfg) -> None:
         data={"chat_id": chat_id},
     )
     logger.info("Revisão semanal agendada às %s para chat_id=%s", t, chat_id)
+

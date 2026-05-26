@@ -43,6 +43,8 @@ MSG_AJUDA = (
     "👫 /casal — mandar as tarefas de casa pro grupo\n"
     "🔍 /buscar <palavra> — achar uma tarefa\n"
     "🏆 /conquistas — ver o que você concluiu na semana\n"
+    "📤 /exportar — todas as tarefas abertas em texto\n"
+    "🍅 /foco [min] [descanso] — iniciar um pomodoro (padrão 50+15)\n"
     "⚙️ /config — horários e ajustes\n\n"
     "🏓 /ping — verificar se estou funcionando\n"
     "🔄 /reiniciar — reiniciar o bot\n\n"
@@ -838,3 +840,89 @@ def msg_config_status(cfg) -> str:
         f"🗂️ Revisão semanal: {revisao}\n"
         f"👫 Grupo do casal: {casal}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Energia do dia (Sugestão #1)
+# ---------------------------------------------------------------------------
+
+MSG_ENERGIA_DO_DIA_CHECK = "Como está sua energia hoje?"
+
+MSG_ENERGIA_DO_DIA_SALVA = "Energia registrada. O /agora vai usar isso enquanto o dia durar."
+
+
+# ---------------------------------------------------------------------------
+# Prazo vencido (Sugestão #4)
+# ---------------------------------------------------------------------------
+
+def msg_prazo_vencido(task_title: str) -> str:
+    return (
+        f"⏰ *{task_title}* estava com prazo para hoje e ainda está aberta.\n\n"
+        "O que quer fazer?"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Exportar (Sugestão #8)
+# ---------------------------------------------------------------------------
+
+MSG_EXPORTAR_VAZIO = "Nenhuma tarefa aberta no momento 🎉"
+
+
+def msg_exportar(groups) -> str:
+    """Formata todas as tarefas abertas em texto copiável."""
+    lines = ["📋 Tarefas abertas\n"]
+    for group in groups:
+        lines.append(f"\n{group.list_name}")
+        lines.append("─" * len(group.list_name))
+        for t in group.tasks:
+            status = "⏳" if t.status == "aguardando" else "•"
+            due = ""
+            if t.due_at:
+                import pytz
+                tz = pytz.timezone("America/Fortaleza")
+                due = f" [{t.due_at.astimezone(tz).strftime('%d/%m')}]"
+            lines.append(f"{status} {t.title}{due}")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Pomodoro / Foco
+# ---------------------------------------------------------------------------
+
+def msg_foco_iniciado(work_min: int) -> str:
+    return (
+        f"🍅 Foco iniciado! {work_min} min de trabalho.\n\n"
+        "Fecha as abas, silencia as notificações. Te aviso quando terminar."
+    )
+
+
+def msg_foco_work_done(work_min: int, break_min: int, ciclo: int) -> str:
+    ciclo_txt = f"Ciclo {ciclo}" if ciclo > 1 else "Primeiro ciclo"
+    return (
+        f"⏰ {ciclo_txt} concluído! {work_min} min — muito bem.\n\n"
+        f"Hora de descansar por {break_min} min. Levanta, bebe água ☕"
+    )
+
+
+def msg_foco_break_iniciado(break_min: int) -> str:
+    return f"☕ Descanso iniciado. Te aviso em {break_min} min."
+
+
+def msg_foco_break_done(ciclo: int) -> str:
+    return (
+        f"🔔 Descanso acabou! Ciclo {ciclo} completo.\n\n"
+        "Pronto para mais um?"
+    )
+
+
+def msg_foco_encerrado(ciclos: int, work_min: int) -> str:
+    total = ciclos * work_min
+    s = "" if ciclos == 1 else "s"
+    return (
+        f"✅ Sessão encerrada! {ciclos} ciclo{s} — {total} min de foco.\n\n"
+        "Bom trabalho!"
+    )
+
+
+MSG_FOCO_NENHUM_ATIVO = "Nenhuma sessão de foco ativa no momento."

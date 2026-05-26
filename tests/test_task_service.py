@@ -2076,3 +2076,81 @@ def test_get_subtasks_aceita_string_uuid(svc):
     resultado = task_service.get_subtasks(str(pai.id))
 
     assert len(resultado) == 1
+
+
+# ---------------------------------------------------------------------------
+# Energia do dia (Sugestao 1)
+# ---------------------------------------------------------------------------
+
+def test_set_energia_do_dia_salva_e_recupera(svc):
+    user = _user(svc)
+
+    task_service.set_energia_do_dia(user.telegram_chat_id, "alta")
+
+    cfg = task_service.get_config(user.telegram_chat_id)
+    assert cfg is not None
+    assert cfg.energia_do_dia == "alta"
+    assert cfg.energia_do_dia_data is not None
+
+
+def test_set_energia_do_dia_sobrescreve(svc):
+    user = _user(svc)
+    task_service.set_energia_do_dia(user.telegram_chat_id, "alta")
+    task_service.set_energia_do_dia(user.telegram_chat_id, "baixa")
+
+    cfg = task_service.get_config(user.telegram_chat_id)
+    assert cfg.energia_do_dia == "baixa"
+
+
+# ---------------------------------------------------------------------------
+# Prazo vencido (Sugestao 4)
+# ---------------------------------------------------------------------------
+
+def test_get_overdue_unalerted_retorna_tarefa_vencida(svc):
+    user = _user(svc)
+    task = _task(svc, user)
+    task.due_at = datetime.now(timezone.utc) - timedelta(hours=2)
+    task.due_alerted = False
+    svc.flush()
+
+    result = task_service.get_overdue_unalerted_tasks()
+
+    task_ids = [t.id for t, _ in result]
+    assert task.id in task_ids
+
+
+def test_get_overdue_unalerted_ignora_ja_alertada(svc):
+    user = _user(svc)
+    task = _task(svc, user)
+    task.due_at = datetime.now(timezone.utc) - timedelta(hours=2)
+    task.due_alerted = True
+    svc.flush()
+
+    result = task_service.get_overdue_unalerted_tasks()
+
+    task_ids = [t.id for t, _ in result]
+    assert task.id not in task_ids
+
+
+def test_get_overdue_unalerted_ignora_sem_prazo(svc):
+    user = _user(svc)
+    task = _task(svc, user)
+    svc.flush()
+
+    result = task_service.get_overdue_unalerted_tasks()
+
+    task_ids = [t.id for t, _ in result]
+    assert task.id not in task_ids
+
+
+def test_mark_due_alerted_funciona(svc):
+    user = _user(svc)
+    task = _task(svc, user)
+    task.due_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    task.due_alerted = False
+    svc.flush()
+
+    task_service.mark_due_alerted(task.id)
+    svc.refresh(task)
+
+    assert task.due_alerted is True

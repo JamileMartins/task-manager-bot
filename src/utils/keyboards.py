@@ -493,3 +493,54 @@ def kb_agora_adiar(task_id: uuid.UUID) -> InlineKeyboardMarkup:
         InlineKeyboardButton("3 dias", callback_data=f"ag_adf:{tid}:3"),
         InlineKeyboardButton("1 semana", callback_data=f"ag_adf:{tid}:7"),
     ]])
+
+
+# ---------------------------------------------------------------------------
+# Energia do dia (Sugestão #1)
+# ---------------------------------------------------------------------------
+
+def kb_energia_do_dia() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("⚡ Alta", callback_data="edia:alta"),
+        InlineKeyboardButton("🔋 Média", callback_data="edia:media"),
+        InlineKeyboardButton("🪫 Baixa", callback_data="edia:baixa"),
+    ]])
+
+
+# ---------------------------------------------------------------------------
+# Prazo vencido (Sugestão #4)
+# ---------------------------------------------------------------------------
+
+def kb_prazo_vencido(task_id: uuid.UUID) -> InlineKeyboardMarkup:
+    tid = str(task_id)
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📅 Adiar 1 dia", callback_data=f"od_adiar:{tid}"),
+            InlineKeyboardButton("👀 Ver tarefa", callback_data=f"task_dt:{tid}"),
+        ],
+        [InlineKeyboardButton("🗑️ Arquivar", callback_data=f"od_arch:{tid}")],
+    ])
+
+
+# ---------------------------------------------------------------------------
+# Pomodoro / Foco
+# ---------------------------------------------------------------------------
+
+def kb_foco_cancelar() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("⏹ Cancelar foco", callback_data="foco_cancel"),
+    ]])
+
+
+def kb_foco_work_done(break_min: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton(f"☕ Descansar {break_min}min", callback_data=f"foco_descanso:{break_min}"),
+        InlineKeyboardButton("⏭️ Pular", callback_data="foco_pular"),
+    ]])
+
+
+def kb_foco_break_done(work_min: int, break_min: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"🔄 Mais um ciclo ({work_min}min)", callback_data=f"foco_ciclo:{work_min}:{break_min}")],
+        [InlineKeyboardButton("✅ Encerrar", callback_data="foco_encerrar")],
+    ])

@@ -40,6 +40,8 @@ from src.handlers.config_handler import (
     cmd_config,
 )
 from src.handlers.rituals import (
+    cb_overdue_adiar,
+    cb_overdue_arch,
     cb_rev_arch,
     cb_rev_date,
     cb_rev_manter,
@@ -50,6 +52,7 @@ from src.handlers.rituals import (
     cb_rev_wait_cobrar,
     cb_rev_wait_destravar,
     cb_rev_wait_seguir,
+    cb_set_energia_dia,
     setup_jobs,
 )
 from src.handlers.agora import (
@@ -75,6 +78,7 @@ from src.handlers.common import (
     cmd_buscar,
     cmd_casal,
     cmd_conquistas,
+    cmd_exportar,
     cmd_hoje,
     cmd_inbox,
     cmd_ping,
@@ -84,6 +88,15 @@ from src.handlers.common import (
     cmd_start,
     cmd_tudo,
     error_handler,
+)
+from src.handlers.foco import (
+    cb_foco_cancelar,
+    cb_foco_ciclo,
+    cb_foco_descanso,
+    cb_foco_encerrar,
+    cb_foco_pular,
+    cmd_foco,
+    cmd_parar_foco,
 )
 from src.handlers.lists import (
     cb_archive_list,
@@ -153,6 +166,9 @@ def main() -> None:
     app.add_handler(CommandHandler("hoje", cmd_hoje))
     app.add_handler(CommandHandler("amanha", cmd_amanha))
     app.add_handler(CommandHandler("conquistas", cmd_conquistas))
+    app.add_handler(CommandHandler("exportar", cmd_exportar))
+    app.add_handler(CommandHandler("foco", cmd_foco))
+    app.add_handler(CommandHandler("parar_foco", cmd_parar_foco))
 
     # ConversationHandlers (antes do capture handler)
     app.add_handler(title_conversation)
@@ -186,6 +202,20 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(cb_rev_wait_destravar, pattern=r"^rv_wu:"))
     app.add_handler(CallbackQueryHandler(cb_rev_wait_arch, pattern=r"^rv_wa:"))
     app.add_handler(CallbackQueryHandler(cb_rev_wait_seguir, pattern=r"^rv_ws:"))
+
+    # Energia do dia
+    app.add_handler(CallbackQueryHandler(cb_set_energia_dia, pattern=r"^edia:"))
+
+    # Prazo vencido
+    app.add_handler(CallbackQueryHandler(cb_overdue_adiar, pattern=r"^od_adiar:"))
+    app.add_handler(CallbackQueryHandler(cb_overdue_arch, pattern=r"^od_arch:"))
+
+    # Pomodoro
+    app.add_handler(CallbackQueryHandler(cb_foco_cancelar, pattern=r"^foco_cancel$"))
+    app.add_handler(CallbackQueryHandler(cb_foco_descanso, pattern=r"^foco_descanso:"))
+    app.add_handler(CallbackQueryHandler(cb_foco_pular, pattern=r"^foco_pular$"))
+    app.add_handler(CallbackQueryHandler(cb_foco_ciclo, pattern=r"^foco_ciclo:"))
+    app.add_handler(CallbackQueryHandler(cb_foco_encerrar, pattern=r"^foco_encerrar$"))
 
     # /config
     app.add_handler(CallbackQueryHandler(cb_config_daily, pattern=r"^cfg_daily$"))

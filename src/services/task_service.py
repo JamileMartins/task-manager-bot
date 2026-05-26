@@ -864,6 +864,7 @@ def update_config(chat_id: int, **kwargs) -> Optional[Config]:
     _allowed = {
         "daily_summary_time", "weekly_review_dow", "weekly_review_time",
         "couple_group_chat_id", "stale_days", "stale_waiting_days",
+        "energia_do_dia", "energia_do_dia_data",
     }
     with get_session() as session:
         user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
@@ -878,6 +879,38 @@ def update_config(chat_id: int, **kwargs) -> Optional[Config]:
             if k in _allowed:
                 setattr(cfg, k, v)
         return cfg
+
+
+def set_energia_do_dia(chat_id: int, energia: str) -> None:
+    """Salva a energia do dia e a data em que foi definida."""
+    from datetime import date as _date
+    today = _date.today()
+    update_config(chat_id, energia_do_dia=energia, energia_do_dia_data=today)
+
+
+def get_overdue_unalerted_tasks() -> list[tuple[Task, int]]:
+    """Retorna (task, chat_id) para tarefas abertas com prazo vencido ainda não alertadas."""
+    now = _now()
+    with get_session() as session:
+        rows = session.execute(
+            select(Task, User.telegram_chat_id)
+            .join(User, Task.user_id == User.id)
+            .where(
+                Task.status == "aberta",
+                Task.due_at.is_not(None),
+                Task.due_at < now,
+                or_(Task.due_alerted.is_(None), Task.due_alerted.is_(False)),
+            )
+        ).all()
+        return [(row[0], row[1]) for row in rows]
+
+
+def mark_due_alerted(task_id: str | uuid.UUID) -> None:
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        task = session.get(Task, uid)
+        if task:
+            task.due_alerted = True
 
 
 # ---------------------------------------------------------------------------
