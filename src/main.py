@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 
+from telegram import BotCommand, MenuButtonCommands
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -143,12 +144,39 @@ logging.getLogger("telegram").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
+_BOT_COMMANDS = [
+    BotCommand("agora",      "Escolhe UMA tarefa para agora"),
+    BotCommand("hoje",       "Focos e prazos de hoje"),
+    BotCommand("amanha",     "Tarefas com prazo amanhã"),
+    BotCommand("proximos",   "Agenda dos próximos dias"),
+    BotCommand("inbox",      "Caixa de entrada"),
+    BotCommand("listas",     "Ver e gerenciar listas"),
+    BotCommand("tudo",       "Todas as tarefas abertas"),
+    BotCommand("projetos",   "Progresso por lista"),
+    BotCommand("conquistas", "Histórico de conclusões"),
+    BotCommand("exportar",   "Tarefas abertas em texto"),
+    BotCommand("foco",       "Iniciar pomodoro (padrão 50+15 min)"),
+    BotCommand("medicacoes", "Checklist de medicações"),
+    BotCommand("buscar",     "Buscar tarefa por palavra"),
+    BotCommand("pausar",     "Silenciar notificações por N dias"),
+    BotCommand("retomar",    "Reativar notificações"),
+    BotCommand("config",     "Configurações do bot"),
+    BotCommand("ajuda",      "Tudo que o bot sabe fazer"),
+    BotCommand("ping",       "Verificar se está funcionando"),
+]
+
+
+async def _setup_menu(app: Application) -> None:
+    await app.bot.set_my_commands(_BOT_COMMANDS)
+    await app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+    logger.info("Menu de comandos registrado no Telegram.")
+
 
 def main() -> None:
     logger.info("Iniciando Task Manager...")
     run_migrations()
 
-    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    app = Application.builder().token(TELEGRAM_BOT_TOKEN).post_init(_setup_menu).build()
 
     # Comandos
     app.add_handler(CommandHandler("start", cmd_start))
