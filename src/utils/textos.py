@@ -887,7 +887,11 @@ MSG_EXPORTAR_VAZIO = "Nenhuma tarefa aberta no momento 🎉"
 
 def msg_exportar(groups) -> str:
     """Formata todas as tarefas abertas em texto copiável."""
-    lines = ["📋 Tarefas abertas\n"]
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    _tz = ZoneInfo("America/Fortaleza")
+    hoje = datetime.now(_tz).strftime("%d/%m/%Y")
+    lines = [f"📋 Tarefas abertas — {hoje}\n"]
     for group in groups:
         lines.append(f"\n{group.name}")
         lines.append("─" * len(group.name))
@@ -895,9 +899,7 @@ def msg_exportar(groups) -> str:
             status = "⏳" if t.status == "aguardando" else "•"
             due = ""
             if t.due_at:
-                import pytz
-                tz = pytz.timezone("America/Fortaleza")
-                due = f" [{t.due_at.astimezone(tz).strftime('%d/%m')}]"
+                due = f" [{t.due_at.astimezone(_tz).strftime('%d/%m')}]"
             lines.append(f"{status} {t.title}{due}")
     return "\n".join(lines)
 
