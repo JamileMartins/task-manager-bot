@@ -2154,3 +2154,140 @@ def test_mark_due_alerted_funciona(svc):
     svc.refresh(task)
 
     assert task.due_alerted is True
+
+
+# ---------------------------------------------------------------------------
+# /proximos — get_upcoming_tasks (Sugestão #5)
+# ---------------------------------------------------------------------------
+
+def test_get_upcoming_tasks_retorna_tarefas_futuras(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+    futuro = datetime.now(timezone.utc) + timedelta(days=3)
+    t = _task_f3(svc, user, title="Tarefa em 3 dias", due_at=futuro)
+
+    resultado = task_service.get_upcoming_tasks(user.telegram_chat_id, 7)
+
+    assert any(r.id == t.id for r in resultado)
+
+
+def test_get_upcoming_tasks_nao_retorna_hoje(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+    hoje = datetime.now(timezone.utc)
+    t = _task_f3(svc, user, title="Tarefa de hoje", due_at=hoje)
+
+    resultado = task_service.get_upcoming_tasks(user.telegram_chat_id, 7)
+
+    assert not any(r.id == t.id for r in resultado)
+
+
+def test_get_upcoming_tasks_nao_retorna_alem_do_range(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+    longe = datetime.now(timezone.utc) + timedelta(days=15)
+    t = _task_f3(svc, user, title="Tarefa distante", due_at=longe)
+
+    resultado = task_service.get_upcoming_tasks(user.telegram_chat_id, 7)
+
+    assert not any(r.id == t.id for r in resultado)
+
+
+def test_get_upcoming_tasks_usuario_inexistente_retorna_vazio(svc):
+    assert task_service.get_upcoming_tasks(999888, 7) == []
+
+
+# ---------------------------------------------------------------------------
+# /pausar / /retomar — is_paused, pause_bot, resume_bot (Sugestão #7)
+# ---------------------------------------------------------------------------
+
+def test_is_paused_retorna_false_sem_config(svc):
+    assert task_service.is_paused(999888) is False
+
+
+def test_is_paused_retorna_false_sem_paused_until(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+
+    assert task_service.is_paused(user.telegram_chat_id) is False
+
+
+def test_pause_bot_e_is_paused(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+
+    until = task_service.pause_bot(user.telegram_chat_id, 3)
+
+    assert task_service.is_paused(user.telegram_chat_id) is True
+    assert until > datetime.now(timezone.utc)
+
+
+def test_resume_bot_desativa_pausa(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+    task_service.pause_bot(user.telegram_chat_id, 3)
+
+    task_service.resume_bot(user.telegram_chat_id)
+
+    assert task_service.is_paused(user.telegram_chat_id) is False
+
+
+def test_is_paused_retorna_false_se_prazo_no_passado(svc):
+    user = _user(svc)
+    task_service._create_initial_lists(svc, user)
+    svc.flush()
+    passado = datetime.now(timezone.utc) - timedelta(days=1)
+    task_service.update_config(user.telegram_chat_id, paused_until=passado)
+
+    assert task_service.is_paused(user.telegram_chat_id) is False
+
+
+# ---------------------------------------------------------------------------
+# /projetos — get_projetos (2e-7)
+# ---------------------------------------------------------------------------
+
+def test_get_projetos_retorna_lista_com_tarefas(svc):
+    user = _user(svc)
+    lst = _list(svc, user, name="Trabalho")
+    _task(svc, user, list_id=lst.id, title="Tarefa aberta")
+
+    resultado = task_service.get_projetos(user.telegram_chat_id)
+
+    assert len(resultado) == 1
+    assert resultado[0].name == "Trabalho"
+    assert resultado[0].open_count == 1
+
+
+def test_get_projetos_conta_concluidas_30d(svc):
+    user = _user(svc)
+    lst = _list(svc, user, name="Projetos")
+    t = _task(svc, user, list_id=lst.id, title="Concluida")
+    t.status = "concluida"
+    t.completed_at = datetime.now(timezone.utc) - timedelta(days=5)
+    svc.flush()
+
+    resultado = task_service.get_projetos(user.telegram_chat_id)
+
+    match = next((p for p in resultado if p.name == "Projetos"), None)
+    assert match is not None
+    assert match.done_30d == 1
+    assert match.open_count == 0
+
+
+def test_get_projetos_ignora_lista_vazia(svc):
+    user = _user(svc)
+    _list(svc, user, name="Lista Vazia")
+
+    resultado = task_service.get_projetos(user.telegram_chat_id)
+
+    assert not any(p.name == "Lista Vazia" for p in resultado)
+
+
+def test_get_projetos_usuario_inexistente_retorna_vazio(svc):
+    assert task_service.get_projetos(999888) == []

@@ -329,6 +329,85 @@ async def cmd_buscar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 # ---------------------------------------------------------------------------
+# /proximos (Sugestão #5)
+# ---------------------------------------------------------------------------
+
+async def cmd_proximos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_authorized(update):
+        await deny_unauthorized(update)
+        return
+    msg = update.effective_message
+    if not msg:
+        return
+    args = context.args or []
+    try:
+        days = int(args[0]) if args else 7
+    except ValueError:
+        await msg.reply_text(textos.MSG_PROXIMOS_USO)
+        return
+    days = max(1, min(days, 30))
+    chat_id = update.effective_chat.id
+    tasks = await asyncio.to_thread(task_service.get_upcoming_tasks, chat_id, days)
+    if not tasks:
+        await msg.reply_text(textos.MSG_PROXIMOS_VAZIO)
+        return
+    await msg.reply_text(textos.msg_proximos(tasks, days))
+
+
+# ---------------------------------------------------------------------------
+# /pausar / /retomar (Sugestão #7)
+# ---------------------------------------------------------------------------
+
+async def cmd_pausar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_authorized(update):
+        await deny_unauthorized(update)
+        return
+    msg = update.effective_message
+    if not msg:
+        return
+    args = context.args or []
+    try:
+        days = int(args[0]) if args else 1
+    except ValueError:
+        await msg.reply_text(textos.MSG_PAUSAR_USO)
+        return
+    days = max(1, min(days, 90))
+    chat_id = update.effective_chat.id
+    until = await asyncio.to_thread(task_service.pause_bot, chat_id, days)
+    await msg.reply_text(textos.msg_pausado(until))
+
+
+async def cmd_retomar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_authorized(update):
+        await deny_unauthorized(update)
+        return
+    msg = update.effective_message
+    if not msg:
+        return
+    await asyncio.to_thread(task_service.resume_bot, update.effective_chat.id)
+    await msg.reply_text(textos.MSG_RETOMADO)
+
+
+# ---------------------------------------------------------------------------
+# /projetos (2e-7)
+# ---------------------------------------------------------------------------
+
+async def cmd_projetos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_authorized(update):
+        await deny_unauthorized(update)
+        return
+    msg = update.effective_message
+    if not msg:
+        return
+    chat_id = update.effective_chat.id
+    projetos = await asyncio.to_thread(task_service.get_projetos, chat_id)
+    if not projetos:
+        await msg.reply_text(textos.MSG_PROJETOS_VAZIO)
+        return
+    await msg.reply_text(textos.msg_projetos(projetos))
+
+
+# ---------------------------------------------------------------------------
 # Error handler global
 # ---------------------------------------------------------------------------
 

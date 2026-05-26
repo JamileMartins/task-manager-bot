@@ -109,5 +109,6 @@ class Config(Base):
     stale_waiting_days: Mapped[int] = mapped_column(Integer, nullable=False, default=14)
     energia_do_dia: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
     energia_do_dia_data: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    paused_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="config")

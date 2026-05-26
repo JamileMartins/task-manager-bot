@@ -223,6 +223,15 @@ class TaskGroup:
     tasks: list[Task]
 
 
+@dataclass
+class ProjetoInfo:
+    name: str
+    slug: Optional[str]
+    open_count: int
+    done_30d: int
+    last_touch: Optional[datetime]
+
+
 def get_user_lists(chat_id: int) -> list[ListInfo]:
     """Retorna listas ativas com contagem de tarefas abertas."""
     with get_session() as session:
@@ -864,7 +873,7 @@ def update_config(chat_id: int, **kwargs) -> Optional[Config]:
     _allowed = {
         "daily_summary_time", "weekly_review_dow", "weekly_review_time",
         "couple_group_chat_id", "stale_days", "stale_waiting_days",
-        "energia_do_dia", "energia_do_dia_data",
+        "energia_do_dia", "energia_do_dia_data", "paused_until",
     }
     with get_session() as session:
         user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
@@ -1186,3 +1195,111 @@ def get_conquistas(chat_id: int) -> dict:
             "semana": semana,
             "dias_ativos": len(dias_com_conclusao),
         }
+
+
+# ---------------------------------------------------------------------------
+# /proximos — tarefas dos próximos N dias (Sugestão #5)
+# ---------------------------------------------------------------------------
+
+def get_upcoming_tasks(chat_id: int, days: int) -> list[Task]:
+    """Tarefas abertas com prazo entre amanhã e N dias à frente."""
+    import pytz
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return []
+        tz = pytz.timezone(user.timezone or "America/Fortaleza")
+        now_local = datetime.now(tz)
+        tomorrow = now_local + timedelta(days=1)
+        range_start = tomorrow.replace(hour=0, minute=0, second=0, microsecond=0)
+        range_end = (now_local + timedelta(days=days)).replace(
+            hour=23, minute=59, second=59, microsecond=999999
+        )
+        return list(session.scalars(
+            select(Task)
+            .options(selectinload(Task.task_list))
+            .where(
+                Task.user_id == user.id,
+                Task.status == "aberta",
+                Task.due_at >= range_start,
+                Task.due_at <= range_end,
+            )
+            .order_by(Task.due_at)
+        ).all())
+
+
+# ---------------------------------------------------------------------------
+# /pausar / /retomar — silenciar jobs (Sugestão #7)
+# ---------------------------------------------------------------------------
+
+def is_paused(chat_id: int) -> bool:
+    """Retorna True se os jobs automáticos estão pausados para este chat."""
+    cfg = get_config(chat_id)
+    if cfg is None or cfg.paused_until is None:
+        return False
+    until = cfg.paused_until
+    if until.tzinfo is None:
+        until = until.replace(tzinfo=timezone.utc)
+    return until > _now()
+
+
+def pause_bot(chat_id: int, days: int) -> datetime:
+    """Pausa os jobs por N dias. Retorna o datetime de retomada (UTC)."""
+    until = _now() + timedelta(days=days)
+    update_config(chat_id, paused_until=until)
+    return until
+
+
+def resume_bot(chat_id: int) -> None:
+    """Remove a pausa dos jobs."""
+    update_config(chat_id, paused_until=None)
+
+
+# ---------------------------------------------------------------------------
+# /projetos — visão de progresso por lista (2e-7)
+# ---------------------------------------------------------------------------
+
+def get_projetos(chat_id: int) -> list[ProjetoInfo]:
+    """Retorna progresso de cada lista ativa: tarefas abertas, concluídas (30d) e último toque."""
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return []
+        cutoff_30d = _now() - timedelta(days=30)
+        lists = list(session.scalars(
+            select(TaskList)
+            .where(TaskList.user_id == user.id, TaskList.archived.is_(False))
+            .order_by(TaskList.sort_order)
+        ).all())
+        projetos: list[ProjetoInfo] = []
+        for lst in lists:
+            open_count = session.scalar(
+                select(func.count(Task.id)).where(
+                    Task.list_id == lst.id,
+                    Task.status == "aberta",
+                    Task.parent_task_id.is_(None),
+                )
+            ) or 0
+            done_30d = session.scalar(
+                select(func.count(Task.id)).where(
+                    Task.list_id == lst.id,
+                    Task.status == "concluida",
+                    Task.completed_at >= cutoff_30d,
+                    Task.parent_task_id.is_(None),
+                )
+            ) or 0
+            last_touch = session.scalar(
+                select(func.max(Task.last_touched_at)).where(
+                    Task.list_id == lst.id,
+                    Task.status == "aberta",
+                )
+            )
+            if open_count > 0 or done_30d > 0:
+                projetos.append(ProjetoInfo(
+                    name=lst.name,
+                    slug=lst.slug,
+                    open_count=open_count,
+                    done_30d=done_30d,
+                    last_touch=last_touch,
+                ))
+        return projetos

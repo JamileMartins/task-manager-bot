@@ -40,11 +40,15 @@ MSG_AJUDA = (
     "💊 /medicacoes — checklist de medicações do dia/semana\n"
     "☀️ /hoje — seus focos e prazos de hoje\n"
     "🌙 /amanha — o que tem prazo para amanhã\n"
+    "📅 /proximos [N] — agenda dos próximos N dias (padrão 7)\n"
+    "📁 /projetos — progresso por lista\n"
     "👫 /casal — mandar as tarefas de casa pro grupo\n"
     "🔍 /buscar <palavra> — achar uma tarefa\n"
     "🏆 /conquistas — ver o que você concluiu na semana\n"
     "📤 /exportar — todas as tarefas abertas em texto\n"
     "🍅 /foco [min] [descanso] — iniciar um pomodoro (padrão 50+15)\n"
+    "⏸️ /pausar [dias] — silenciar resumos e lembretes por N dias\n"
+    "▶️ /retomar — reativar os resumos e lembretes\n"
     "⚙️ /config — horários e ajustes\n\n"
     "🏓 /ping — verificar se estou funcionando\n"
     "🔄 /reiniciar — reiniciar o bot\n\n"
@@ -639,7 +643,7 @@ def msg_revisao_espera(task, dias: int) -> str:
     )
 
 
-def msg_revisao_encerramento(stats: dict) -> str:
+def msg_revisao_encerramento(stats: dict, dias_ativos: int | None = None) -> str:
     partes = []
     if stats.get("reagendadas"):
         partes.append(f"reagendou {stats['reagendadas']}")
@@ -648,9 +652,21 @@ def msg_revisao_encerramento(stats: dict) -> str:
     if stats.get("destravadas"):
         partes.append(f"destravou {stats['destravadas']}")
     resumo = (", ".join(partes) + ".").capitalize() if partes else "Tudo mantido como estava."
+
+    streak = ""
+    if dias_ativos is not None and dias_ativos > 0:
+        if dias_ativos >= 7:
+            streak = f"\n\n🔥 7 de 7 dias produtivos essa semana. Semana perfeita!"
+        elif dias_ativos >= 5:
+            streak = f"\n\n🔥 {dias_ativos} de 7 dias com tarefas concluídas. Semana muito boa!"
+        elif dias_ativos >= 3:
+            streak = f"\n\n🌱 {dias_ativos} de 7 dias produtivos. Você tá em movimento!"
+        else:
+            streak = f"\n\n🌱 {dias_ativos} de 7 dias com algo concluído. Cada um conta."
+
     return (
         f"Pronto, revisão fechada 🙌\n"
-        f"{resumo}\n\n"
+        f"{resumo}{streak}\n\n"
         "Isso já deixa sua semana mais leve. Até a próxima."
     )
 
@@ -873,8 +889,8 @@ def msg_exportar(groups) -> str:
     """Formata todas as tarefas abertas em texto copiável."""
     lines = ["📋 Tarefas abertas\n"]
     for group in groups:
-        lines.append(f"\n{group.list_name}")
-        lines.append("─" * len(group.list_name))
+        lines.append(f"\n{group.name}")
+        lines.append("─" * len(group.name))
         for t in group.tasks:
             status = "⏳" if t.status == "aguardando" else "•"
             due = ""
@@ -926,3 +942,114 @@ def msg_foco_encerrado(ciclos: int, work_min: int) -> str:
 
 
 MSG_FOCO_NENHUM_ATIVO = "Nenhuma sessão de foco ativa no momento."
+
+
+# ---------------------------------------------------------------------------
+# /proximos (Sugestão #5)
+# ---------------------------------------------------------------------------
+
+_DOW_CURTO = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
+
+MSG_PROXIMOS_VAZIO = (
+    "Nenhuma tarefa com prazo nos próximos dias 🙌\n"
+    "Dia(s) livre(s) por enquanto!"
+)
+
+MSG_PROXIMOS_USO = "Uso: /proximos [dias]\nEx.: /proximos 7"
+
+
+def msg_proximos(tasks: list, days: int) -> str:
+    import pytz
+    tz = pytz.timezone("America/Fortaleza")
+
+    by_date: dict[str, list] = {}
+    dates_order: list[str] = []
+    for t in tasks:
+        local_dt = t.due_at.astimezone(tz)
+        dow = _DOW_CURTO[local_dt.weekday()]
+        key = local_dt.strftime(f"%d/%m ({dow})")
+        if key not in by_date:
+            by_date[key] = []
+            dates_order.append(key)
+        by_date[key].append(t)
+
+    n = len(tasks)
+    s = "" if n == 1 else "s"
+    lines = [f"📅 Próximos {days} dias — {n} tarefa{s}\n"]
+    for date_key in dates_order:
+        lines.append(f"  {date_key}")
+        for t in by_date[date_key]:
+            hora = f" {t.due_at.astimezone(tz).strftime('%H:%M')}" if t.due_at else ""
+            est = f" · {t.estimate_min}min" if t.estimate_min else ""
+            lista = f" [{t.task_list.name}]" if t.task_list else ""
+            lines.append(f"    • {t.title}{hora}{est}{lista}")
+        lines.append("")
+
+    return "\n".join(lines).rstrip()
+
+
+# ---------------------------------------------------------------------------
+# /pausar / /retomar (Sugestão #7)
+# ---------------------------------------------------------------------------
+
+MSG_PAUSAR_USO = "Uso: /pausar [dias]\nEx.: /pausar 3"
+
+MSG_RETOMADO = (
+    "De volta! ▶️\n\n"
+    "Resumos diários, revisão semanal e lembretes reativados."
+)
+
+
+def msg_pausado(until_dt) -> str:
+    import pytz
+    tz = pytz.timezone("America/Fortaleza")
+    dt_local = until_dt.astimezone(tz)
+    return (
+        f"Ok, descansando até {dt_local.strftime('%d/%m às %H:%M')} ⏸️\n\n"
+        "Durante esse período não vou mandar resumo diário, revisão semanal nem lembretes.\n"
+        "Quando quiser retomar antes, é só /retomar."
+    )
+
+
+# ---------------------------------------------------------------------------
+# /projetos (2e-7)
+# ---------------------------------------------------------------------------
+
+MSG_PROJETOS_VAZIO = (
+    "Nenhuma lista com tarefas ativas no momento 🎉\n"
+    "Tudo concluído ou ainda não começou."
+)
+
+
+def _barra_progresso(done: int, total: int, width: int = 8) -> str:
+    if total == 0:
+        return "○" * width
+    filled = round(done / total * width)
+    return "●" * filled + "○" * (width - filled)
+
+
+def msg_projetos(projetos) -> str:
+    import pytz
+    from datetime import timezone as _tz
+    tz = pytz.timezone("America/Fortaleza")
+
+    lines = ["📁 Projetos\n"]
+    for p in projetos:
+        total = p.open_count + p.done_30d
+        barra = _barra_progresso(p.done_30d, total)
+        pct = f"{p.done_30d}/{total} ✅" if total > 0 else "0/0"
+
+        if p.last_touch:
+            lt = p.last_touch
+            if lt.tzinfo is None:
+                lt = lt.replace(tzinfo=_tz.utc)
+            toque = lt.astimezone(tz).strftime("%d/%m")
+        else:
+            toque = "—"
+
+        emoji = lista_emoji(p.slug or "")
+        lines.append(f"{emoji} {p.name}")
+        lines.append(f"  {barra} {pct} · {p.open_count} abertas · toque {toque}")
+        lines.append("")
+
+    return "\n".join(lines).rstrip()

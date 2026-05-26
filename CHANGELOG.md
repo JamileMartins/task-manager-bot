@@ -7,6 +7,24 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não lançado]
 
+## [1.15.0] — 2026-05-26 — /proximos, /pausar, /projetos e streak semanal
+
+### Adicionado
+
+- **`/proximos [N]` (Sugestão #5)** — agenda dos próximos N dias (padrão 7, máx 30), tarefas agrupadas por data com hora, estimativa e lista. Cobre o gap entre `/amanha` (1 dia) e uma visão de semana completa.
+- **`/pausar [dias]` + `/retomar` (Sugestão #7)** — silencia todos os jobs automáticos (resumo diário, revisão semanal, lembretes de prazo) por N dias (padrão 1, máx 90). Campo `paused_until` em `config`; `/retomar` limpa imediatamente.
+- **Streak semanal no fechamento da revisão (Sugestão #10)** — ao fechar a revisão semanal, `msg_revisao_encerramento` exibe quantos dos últimos 7 dias tiveram tarefas concluídas, com tom progressivo (🌱 / 🔥).
+- **`/projetos` (2e-7)** — visão de progresso por lista: barra textual `●●●○○○○○`, contagem `concluídas/total (30d)`, tarefas abertas e data do último toque. Listas sem atividade ficam ocultas.
+
+### Corrigido
+
+- **`msg_exportar` usava `group.list_name`** — campo inexistente em `TaskGroup`; corrigido para `group.name`.
+
+### Infraestrutura
+
+- Migration `0003`: coluna `paused_until` (DateTime with timezone) em `config`.
+- 13 novos testes: `get_upcoming_tasks` (4), `is_paused`/`pause_bot`/`resume_bot` (5), `get_projetos` (4). 342 total.
+
 ## [1.14.0] — 2026-05-26 — Energia do dia, prazo vencido, /exportar e /foco
 
 ### Adicionado

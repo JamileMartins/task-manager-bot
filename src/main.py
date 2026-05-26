@@ -81,9 +81,13 @@ from src.handlers.common import (
     cmd_exportar,
     cmd_hoje,
     cmd_inbox,
+    cmd_pausar,
     cmd_ping,
+    cmd_projetos,
+    cmd_proximos,
     cmd_quadrantes,
     cmd_reiniciar,
+    cmd_retomar,
     cmd_setgrupo,
     cmd_start,
     cmd_tudo,
@@ -167,6 +171,10 @@ def main() -> None:
     app.add_handler(CommandHandler("amanha", cmd_amanha))
     app.add_handler(CommandHandler("conquistas", cmd_conquistas))
     app.add_handler(CommandHandler("exportar", cmd_exportar))
+    app.add_handler(CommandHandler("proximos", cmd_proximos))
+    app.add_handler(CommandHandler("projetos", cmd_projetos))
+    app.add_handler(CommandHandler("pausar", cmd_pausar))
+    app.add_handler(CommandHandler("retomar", cmd_retomar))
     app.add_handler(CommandHandler("foco", cmd_foco))
     app.add_handler(CommandHandler("parar_foco", cmd_parar_foco))
 

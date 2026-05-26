@@ -21,6 +21,7 @@ from src.services.task_service import (
     get_stale_tasks,
     get_stale_waiting_tasks,
     get_task_with_list,
+    is_paused,
     mark_due_alerted,
     mark_reminder_sent,
     reschedule_task,
@@ -74,6 +75,8 @@ def _rev_clear(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
 
 async def send_reminders(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Job a cada minuto: dispara lembretes vencidos (US-17) e desbloqueia tarefas aguardando por data (US-28)."""
+    if is_paused(AUTHORIZED_CHAT_ID):
+        return
     try:
         due = get_due_reminders()
     except Exception:
@@ -130,6 +133,8 @@ async def send_reminders(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def send_daily_summary(context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = context.job.data["chat_id"]
+    if is_paused(chat_id):
+        return
     today_tasks, focus_tasks = get_daily_summary_tasks(chat_id)
     stats = get_conquistas(chat_id)
 
@@ -151,6 +156,8 @@ async def send_daily_summary(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def send_weekly_review(context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = context.job.data["chat_id"]
+    if is_paused(chat_id):
+        return
 
     cfg = get_config(chat_id)
     if cfg and cfg.weekly_review_dow is not None:
@@ -245,7 +252,9 @@ async def _send_next_rev(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> No
 async def _close_rev(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
     stats = _rev(context, chat_id).get("stats", {})
     _rev_clear(context, chat_id)
-    await context.bot.send_message(chat_id, msg_revisao_encerramento(stats))
+    conquistas = await asyncio.to_thread(get_conquistas, chat_id)
+    dias_ativos = conquistas.get("dias_ativos", 0)
+    await context.bot.send_message(chat_id, msg_revisao_encerramento(stats, dias_ativos))
 
 
 def _advance_stale(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
