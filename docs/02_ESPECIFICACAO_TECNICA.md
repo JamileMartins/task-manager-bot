@@ -1,4 +1,4 @@
-# Especificação Técnica — Bot "Foco"
+# Especificação Técnica — Bot "Task Manager"
 
 > Versão 1.0 — MVP
 > Companion do `01_PRD.md`

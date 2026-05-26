@@ -1,0 +1,94 @@
+# Changelog — Task Manager Bot
+
+Todas as mudanças notáveis estão documentadas aqui.
+Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
+
+---
+
+## [Não lançado]
+
+## [1.6.0] — 2026-05-26 — F6: Captura direta, visão geral e medicações
+
+### Adicionado
+- **US-30** — Botão `➕ Adicionar` na tela de qualquer lista: cria tarefa diretamente sem passar pela IA, com confirmação e botão desfazer.
+- **US-31** — Comando `/tudo`: exibe todas as tarefas abertas agrupadas por lista (Inbox primeiro). Tarefas `aguardando` aparecem com ⏳. Se total > 30, limita a 5 por grupo.
+- **US-32** — Comando `/medicacoes`: checklist de medicações diárias e semanais da lista Saúde, com botão ✅ por item e fluxo guiado `➕ Nova medicação` (nome → frequência).
+
+### Infraestrutura
+- Alembic configurado com migração inicial (`0001_initial_schema`); startup usa `alembic upgrade head`.
+
+### Renomeado
+- Bot renomeado de "Foco" para "Task Manager".
+
+---
+
+## [1.5.0] — 2026-05-25 — F5: Casal, busca e polimento
+
+### Adicionado
+- **US-19** — Comando `/casal`: envia tarefas da lista Casa (casal) para o grupo configurado.
+- **US-19** — Comando `/setgrupo`: registra o grupo do Telegram como destino das tarefas de casal.
+- **US-22** — Comando `/buscar <termo>`: busca por palavra-chave no título e nas notas de todas as tarefas ativas.
+
+### Corrigido
+- **US-29** — `cb_rev_wait_seguir` agora reinicia o contador `waiting_since` ao escolher "Seguir esperando" na revisão.
+
+### Melhorado
+- Substituído "Jamile" por "usuária" em todos os textos e fallbacks do código.
+- Referências à API do Claude corrigidas para Google Gemini API.
+
+---
+
+## [1.4.0] — 2026-05 — F4: Rituais, impedimentos e recorrência
+
+### Adicionado
+- **US-15** — Resumo diário automático com tarefas do dia e focos Q1/Q2.
+- **US-16** — Revisão semanal automática: tarefas paradas há N dias com opções reagendar / arquivar / manter.
+- **US-17** — Lembretes por horário via `due_at` (job a cada minuto).
+- **US-18** — Recorrência de tarefas (diária, semanal, mensal): ao concluir, cria automaticamente a próxima ocorrência.
+- **US-20** — Comando `/config`: horário do resumo diário e dia/hora da revisão semanal.
+- **US-23–28** — Fluxo completo de impedimentos: identifica causa (vaga_grande, decisão_pendente, aversiva, pessoa, recurso, data_externa, obsoleta) e encaminha para próximo passo ou status `aguardando`.
+- **US-29** — Revisão de esperas: tarefas `aguardando` há mais de N dias aparecem em seção separada com opções cobrar / destravar / arquivar / seguir esperando.
+- Comando `/quadrantes`: guia da Matriz de Eisenhower e níveis de energia.
+
+---
+
+## [1.3.0] — 2026-05 — F3: Priorização e /agora
+
+### Adicionado
+- **US-07** — Detalhe de tarefa com edição inline de quadrante, energia, tempo estimado, prazo e recorrência.
+- **US-08** — Edição de quadrante (Q1–Q4) direto no detalhe.
+- **US-09** — Edição de energia (alta / média / baixa).
+- **US-10** — Edição de estimativa de tempo (5 / 15 / 30 / 60 / 120 min).
+- **US-11** — Definição de prazo (hoje / amanhã / sem prazo) e reordenação (↑ ↓).
+- **US-12** — Comando `/agora`: filtra por tempo e energia, retorna UMA tarefa sugerida.
+
+---
+
+## [1.2.0] — 2026-05 — F2: Classificação por IA
+
+### Adicionado
+- **US-02** — Brain dump: múltiplas tarefas em uma mensagem, separadas e classificadas pela IA (Google Gemini).
+- **US-03** — Aprovação em bloco: "✅ Aprovar tudo" ou ajuste item a item.
+- **US-04** — Triagem da Inbox: itens com baixa confiança ficam na Inbox para organização manual.
+
+---
+
+## [1.1.0] — 2026-05 — F1: Núcleo
+
+### Adicionado
+- **US-01** — Captura de tarefa em texto livre → Inbox automático.
+- **US-05** — Listagem de listas com contagem de tarefas abertas.
+- **US-06** — Criar, renomear e arquivar listas.
+- **US-13** — Concluir tarefa com botão ✅; desfazer com ↩️.
+- **US-21** — Restrição de acesso por `chat_id` autorizado.
+- Comando `/start`, `/ajuda`, `/inbox`, `/listas`, `/ping`, `/reiniciar`.
+- Deploy no Railway com PostgreSQL (Supabase).
+
+---
+
+## [1.0.0] — 2026-05 — Estrutura inicial
+
+### Adicionado
+- Scaffolding do projeto: estrutura de pastas, modelos SQLAlchemy, sessão com pool, configuração Railway.
+- Modelos: `users`, `lists`, `tasks`, `reminders`, `config`.
+- Documentação inicial: PRD, especificação técnica, histórias de usuário, prompt de IA, textos do bot.

@@ -1,4 +1,4 @@
-# Histórias de Usuário — Bot "Foco"
+# Histórias de Usuário — Bot "Task Manager"
 
 > Versão 1.0 — MVP
 > Formato: "Como [persona], quero [ação], para [benefício]."
@@ -350,7 +350,7 @@
   - Ao tocar, o bot pede o título da tarefa.
   - A tarefa é criada diretamente naquela lista, com status "aberta", sem chamar a IA.
   - O bot confirma com o nome da lista e botão de desfazer.
-- Prioridade: Must · Fase: F6 · **Status: ❌ Pendente**
+- Prioridade: Must · Fase: F6 · **Status: ✅ Feito**
 
 ### US-31 — Ver todas as tarefas de uma vez
 
@@ -362,7 +362,7 @@
   - Cada grupo mostra o nome da lista e as tarefas com botão ✅.
   - Se o total ultrapassar 30 itens, cada lista mostra as 5 primeiras com indicação de quantas restam.
   - Tarefas em status "aguardando" aparecem com marcador ⏳ mas não têm botão ✅ (apenas link para detalhe).
-- Prioridade: Should · Fase: F6 · **Status: ❌ Pendente**
+- Prioridade: Should · Fase: F6 · **Status: ✅ Feito**
 
 ### US-32 — Checklist de medicações diárias e semanais
 
@@ -374,7 +374,7 @@
   - Cada medicação tem botão ✅ para marcar como tomada; ao concluir, cria automaticamente a próxima ocorrência (via recorrência já implementada).
   - Há botão "➕ Nova medicação" que guia: pede nome → frequência (Diária / Semanal) → cria a tarefa com recorrência e due_at a partir de hoje.
   - Se não houver medicações cadastradas, orienta como criar.
-- Prioridade: Should · Fase: F6 · **Status: ❌ Pendente**
+- Prioridade: Should · Fase: F6 · **Status: ✅ Feito**
 
 ---
 
@@ -387,4 +387,4 @@
 | F3 | US-07, US-08, US-09, US-10, US-11, US-12 | ✅ Completa |
 | F4 | US-14, US-15, US-16, US-17, US-18, US-20, US-23, US-24, US-25, US-26, US-27, US-28, US-29 | ✅ Completa |
 | F5 | US-19, US-22 | ✅ Completa |
-| F6 | US-30, US-31, US-32 | ❌ Pendente |
+| F6 | US-30, US-31, US-32 | ✅ Completa |

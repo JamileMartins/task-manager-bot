@@ -1,4 +1,4 @@
-# Prompt de Classificação da IA — Bot "Foco"
+# Prompt de Classificação da IA — Bot "Task Manager"
 
 > Versão 1.0 — companion da `02_ESPECIFICACAO_TECNICA.md` (§4)
 > Este arquivo é a especificação completa do serviço de classificação do brain dump.

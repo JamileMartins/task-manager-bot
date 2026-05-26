@@ -1,4 +1,4 @@
-# PRD — Bot de Tarefas "Foco" (Telegram)
+# PRD — Bot de Tarefas "Task Manager" (Telegram)
 
 > Documento de Requisitos do Produto (Product Requirements Document)
 > Versão 1.0 — MVP
@@ -9,7 +9,7 @@
 
 ## 1. Visão geral
 
-**Foco** é um bot de Telegram que funciona como um "segundo cérebro" para captura e organização de tarefas, projetado especificamente para reduzir o atrito de uso e apoiar funções executivas de uma pessoa com TDAH.
+**Task Manager** é um bot de Telegram que funciona como um "segundo cérebro" para captura e organização de tarefas, projetado especificamente para reduzir o atrito de uso e apoiar funções executivas de uma pessoa com TDAH.
 
 O princípio central é: **capturar deve ser instantâneo; organizar deve ser opcional e assistido por IA; decidir o que fazer agora deve ser guiado, não exigir esforço de priorização do usuário.**
 

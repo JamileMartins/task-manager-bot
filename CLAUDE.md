@@ -1,11 +1,11 @@
-# CLAUDE.md — Guia para desenvolvimento do Bot "Foco"
+# CLAUDE.md — Guia para desenvolvimento do Bot "Task Manager"
 
 > Este arquivo orienta o Claude Code no desenvolvimento deste projeto.
 > Leia também `docs/01_PRD.md`, `docs/02_ESPECIFICACAO_TECNICA.md` e `docs/03_HISTORIAS_DE_USUARIO.md` antes de codar.
 
 ## O que é este projeto
 
-Bot de Telegram chamado **Foco**: um "segundo cérebro" de tarefas, mono-usuário, projetado para reduzir atrito e apoiar funções executivas de uma pessoa com TDAH. Captura por texto livre (brain dump), classificação assistida por IA (API Anthropic), priorização via Matriz de Eisenhower, sugestão ativa de "o que fazer agora", e rituais de revisão (diário e semanal).
+Bot de Telegram chamado **Task Manager**: um "segundo cérebro" de tarefas, mono-usuário, projetado para reduzir atrito e apoiar funções executivas de uma pessoa com TDAH. Captura por texto livre (brain dump), classificação assistida por IA (Google Gemini API), priorização via Matriz de Eisenhower, sugestão ativa de "o que fazer agora", e rituais de revisão (diário e semanal).
 
 ## Princípios de design (não violar)
 
@@ -20,7 +20,7 @@ Bot de Telegram chamado **Foco**: um "segundo cérebro" de tarefas, mono-usuári
 
 - Python 3.11+, `python-telegram-bot` v21+ (async).
 - PostgreSQL (Supabase) via SQLAlchemy 2.x + Alembic.
-- API Anthropic (Claude) para classificação.
+- Google Gemini API para classificação.
 - APScheduler (ou JobQueue) para jobs.
 - Hospedagem: Railway/Fly.io. MVP usa long polling.
 

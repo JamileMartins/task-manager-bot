@@ -1,4 +1,4 @@
-# Textos do Bot "Foco" (Microcopy)
+# Textos do Bot "Task Manager" (Microcopy)
 
 > Versão 1.0 — companion dos demais docs.
 > Centraliza todas as mensagens ao usuário, para manter tom consistente (ver CLAUDE.md).

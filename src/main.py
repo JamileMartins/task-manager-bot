@@ -1,4 +1,4 @@
-"""Bootstrap do bot Foco — long polling."""
+"""Bootstrap do bot Task Manager — long polling."""
 from __future__ import annotations
 
 import logging
@@ -120,7 +120,7 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> None:
-    logger.info("Iniciando Bot Foco...")
+    logger.info("Iniciando Task Manager...")
     run_migrations()
 
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()

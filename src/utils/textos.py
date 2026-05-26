@@ -1,4 +1,4 @@
-"""Textos centralizados do bot Foco — fonte: docs/05_TEXTOS_DO_BOT.md."""
+"""Textos centralizados do bot Task Manager — fonte: docs/05_TEXTOS_DO_BOT.md."""
 from __future__ import annotations
 
 import random
@@ -13,7 +13,7 @@ def _pick(*variants: str) -> str:
 # ---------------------------------------------------------------------------
 
 MSG_BOAS_VINDAS = (
-    "Oi! Eu sou o Foco 🧠\n\n"
+    "Oi! Eu sou o Task Manager 🧠\n\n"
     "Pensa em mim como um lugar pra despejar tudo que tá na sua cabeça — "
     "sem se preocupar em organizar. Disso eu cuido.\n\n"
     "É só me mandar o que precisa fazer, do jeito que vier. "
@@ -48,7 +48,7 @@ MSG_AJUDA = (
 )
 
 MSG_GUIA_QUADRANTES = (
-    "📖 Como o Foco organiza suas tarefas\n\n"
+    "📖 Como o Task Manager organiza suas tarefas\n\n"
     "━━━━━━━━━━━━━━━━━━━━\n"
     "🗂 Matriz de Eisenhower\n\n"
     "Cada tarefa cai num dos quatro quadrantes:\n\n"
@@ -73,7 +73,7 @@ MSG_GUIA_QUADRANTES = (
     "🔋 Média — tarefas operacionais, comunicação, organização\n"
     "🪫 Baixa — tarefas mecânicas, leituras leves, revisões simples\n\n"
     "━━━━━━━━━━━━━━━━━━━━\n"
-    "🧠 Como o Foco pensa\n\n"
+    "🧠 Como o Task Manager pensa\n\n"
     "1. Você manda texto livre — eu identifico e separo as tarefas\n"
     "2. A IA sugere lista, quadrante, tempo e energia de cada uma\n"
     "3. Você aprova em bloco ou ajusta item a item\n"
