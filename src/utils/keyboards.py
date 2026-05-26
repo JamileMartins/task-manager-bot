@@ -226,12 +226,22 @@ def kb_task_detail(task: Task, listas: list[dict]) -> InlineKeyboardMarkup:
             InlineKeyboardButton("↑", callback_data=f"task_up:{task.id}"),
             InlineKeyboardButton("↓", callback_data=f"task_dn:{task.id}"),
         ])
+        nota_label = "📝 Nota ✓" if task.notes else "📝 Nota"
+        rows.append([InlineKeyboardButton(nota_label, callback_data=f"task_note:{task.id}")])
 
     if task.list_id:
         rows.append([InlineKeyboardButton("← Voltar", callback_data=f"view_list:{task.list_id}")])
     else:
         rows.append([InlineKeyboardButton("← Voltar", callback_data="view_inbox")])
 
+    return InlineKeyboardMarkup(rows)
+
+
+def kb_nota(task_id: str, has_notes: bool) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if has_notes:
+        rows.append([InlineKeyboardButton("🗑️ Apagar nota", callback_data=f"task_note_del:{task_id}")])
+    rows.append([InlineKeyboardButton("✖️ Cancelar", callback_data=f"task_note_cancel:{task_id}")])
     return InlineKeyboardMarkup(rows)
 
 

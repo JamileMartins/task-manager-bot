@@ -354,7 +354,20 @@ def msg_task_detail(task) -> str:
 
     if task.next_step:
         lines.append(f"💡 Próximo passo: {task.next_step}")
+    if task.notes:
+        lines.append(f"\n📝 {task.notes}")
     return "\n".join(lines)
+
+
+def msg_nota_pergunta(task_title: str) -> str:
+    return (
+        f"📝 Qual nota quer adicionar em:\n\n👉 {task_title}\n\n"
+        "Pode ser um link, número de protocolo, contexto — o que ajudar a lembrar."
+    )
+
+
+MSG_NOTA_SALVA = "📝 Nota salva."
+MSG_NOTA_APAGADA = "🗑️ Nota removida."
 
 
 # ---------------------------------------------------------------------------

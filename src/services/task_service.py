@@ -695,7 +695,7 @@ def get_lightest_task(
 
 def update_task_attrs(task_id: str | uuid.UUID, **kwargs) -> Optional[Task]:
     """Atualiza atributos de tarefa. Campos: quadrant, energy, estimate_min, due_at, list_id, next_step, recurrence."""
-    _allowed = {"quadrant", "energy", "estimate_min", "due_at", "list_id", "next_step", "recurrence"}
+    _allowed = {"quadrant", "energy", "estimate_min", "due_at", "list_id", "next_step", "recurrence", "notes"}
     uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
     with get_session() as session:
         task = session.get(Task, uid)

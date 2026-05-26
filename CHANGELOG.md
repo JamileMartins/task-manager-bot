@@ -7,6 +7,17 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não lançado]
 
+## [1.11.0] — 2026-05-26 — Nota em tarefa existente
+
+### Adicionado
+
+- **Nota em tarefa (Sugestão #2)** — botão `📝 Nota` no detalhe de qualquer tarefa abre um ConversationHandler: a usuária envia o texto e ele é salvo no campo `notes`. Nota exibida no detalhe com `📝`. Botão mostra `✓` quando já existe nota.
+- `kb_nota(task_id, has_notes)` — teclado inline com `🗑️ Apagar nota` (se houver nota) e `✖️ Cancelar`.
+- `msg_nota_pergunta`, `MSG_NOTA_SALVA`, `MSG_NOTA_APAGADA` em `utils/textos.py`.
+- `note_conversation` — ConversationHandler em `handlers/task_detail.py`, registrado antes de `list_conversation` em `main.py`.
+- Campo `"notes"` adicionado ao whitelist de `update_task_attrs`.
+- 3 novos testes unitários cobrindo salvar, apagar e sobrescrever nota.
+
 ## [1.10.0] — 2026-05-26 — Correções de lacunas e polimento
 
 ### Corrigido

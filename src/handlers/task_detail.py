@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 import pytz
 from telegram import Update
-from telegram.ext import ContextTypes
+from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes, ConversationHandler, MessageHandler, filters
 
 from src.config import DEFAULT_TIMEZONE
 from src.handlers.common import deny_unauthorized, is_authorized
@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 
 _MOVE_TASK_KEY = "move_task_id"
 _MOVE_LISTAS_KEY = "move_listas"
+_NOTE_TASK_KEY = "note_task_id"
+
+_NOTE_TEXT = 1
 
 
 # ---------------------------------------------------------------------------
@@ -227,3 +230,102 @@ async def cb_task_reorder(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     task_id = uuid.UUID(parts[1])
     await asyncio.to_thread(task_service.reorder_task, task_id, direction)
     await _refresh_detail(query, task_id, context)
+
+
+# ---------------------------------------------------------------------------
+# Nota em tarefa (Sugestão #2)
+# ---------------------------------------------------------------------------
+
+async def cb_task_note_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return ConversationHandler.END
+
+    task_id_str = query.data.split(":")[1]
+    context.user_data[_NOTE_TASK_KEY] = task_id_str
+
+    task = await asyncio.to_thread(task_service.get_task_with_list, uuid.UUID(task_id_str))
+    if task is None:
+        await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+        return ConversationHandler.END
+
+    await query.edit_message_text(
+        textos.msg_nota_pergunta(task.title),
+        reply_markup=keyboards.kb_nota(task_id_str, bool(task.notes)),
+    )
+    return _NOTE_TEXT
+
+
+async def save_task_note(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if not is_authorized(update):
+        return ConversationHandler.END
+
+    task_id_str = context.user_data.get(_NOTE_TASK_KEY)
+    if not task_id_str:
+        return ConversationHandler.END
+
+    note_text = update.message.text.strip()
+    task_id = uuid.UUID(task_id_str)
+    await asyncio.to_thread(task_service.update_task_attrs, task_id, notes=note_text)
+
+    task = await asyncio.to_thread(task_service.get_task_with_list, task_id)
+    listas = context.user_data.get(_MOVE_LISTAS_KEY, [])
+    await update.message.reply_text(textos.MSG_NOTA_SALVA)
+    if task:
+        await update.message.reply_text(
+            textos.msg_task_detail(task),
+            reply_markup=keyboards.kb_task_detail(task, listas),
+        )
+    return ConversationHandler.END
+
+
+async def cb_task_note_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return ConversationHandler.END
+
+    task_id_str = query.data.split(":")[1]
+    task_id = uuid.UUID(task_id_str)
+    await asyncio.to_thread(task_service.update_task_attrs, task_id, notes=None)
+
+    listas = context.user_data.get(_MOVE_LISTAS_KEY, [])
+    task = await asyncio.to_thread(task_service.get_task_with_list, task_id)
+    await query.edit_message_text(
+        textos.MSG_NOTA_APAGADA + ("\n\n" + textos.msg_task_detail(task) if task else ""),
+        reply_markup=keyboards.kb_task_detail(task, listas) if task else None,
+    )
+    return ConversationHandler.END
+
+
+async def cb_task_note_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return ConversationHandler.END
+
+    task_id_str = query.data.split(":")[1]
+    task_id = uuid.UUID(task_id_str)
+    await _refresh_detail(query, task_id, context)
+    return ConversationHandler.END
+
+
+async def _cmd_cancel_note(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text("Nota cancelada.")
+    return ConversationHandler.END
+
+
+note_conversation = ConversationHandler(
+    entry_points=[CallbackQueryHandler(cb_task_note_start, pattern=r"^task_note:[^_]")],
+    states={
+        _NOTE_TEXT: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, save_task_note),
+            CallbackQueryHandler(cb_task_note_delete, pattern=r"^task_note_del:"),
+            CallbackQueryHandler(cb_task_note_cancel, pattern=r"^task_note_cancel:"),
+        ],
+    },
+    fallbacks=[CommandHandler("cancel", _cmd_cancel_note)],
+    per_message=False,
+    name="note_editing",
+)

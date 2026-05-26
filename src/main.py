@@ -104,6 +104,7 @@ from src.handlers.task_detail import (
     cb_task_set_quadrant,
     cb_task_set_recurrence,
     cb_task_start_move,
+    note_conversation,
 )
 from src.handlers.tasks import (
     cb_back_to_lists,
@@ -150,6 +151,7 @@ def main() -> None:
     app.add_handler(CommandHandler("amanha", cmd_amanha))
 
     # ConversationHandlers (antes do capture handler)
+    app.add_handler(note_conversation)
     app.add_handler(list_conversation)
     app.add_handler(medicacoes_conversation)
 

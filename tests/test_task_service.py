@@ -1898,3 +1898,42 @@ def test_find_list_by_term_nao_retorna_arquivada(svc):
     result = task_service.find_list_by_term(user.telegram_chat_id, "arquivada")
 
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Notas em tarefa (Sugestao 2)
+# ---------------------------------------------------------------------------
+
+def test_update_task_attrs_salva_nota(svc):
+    user = _user(svc)
+    task = _task(svc, user)
+
+    result = task_service.update_task_attrs(task.id, notes="Protocolo 12345")
+
+    svc.refresh(task)
+    assert result is not None
+    assert task.notes == "Protocolo 12345"
+
+
+def test_update_task_attrs_apaga_nota(svc):
+    user = _user(svc)
+    task = _task(svc, user)
+    task.notes = "Nota existente"
+    svc.flush()
+
+    task_service.update_task_attrs(task.id, notes=None)
+
+    svc.refresh(task)
+    assert task.notes is None
+
+
+def test_update_task_attrs_sobrescreve_nota(svc):
+    user = _user(svc)
+    task = _task(svc, user)
+    task.notes = "Nota antiga"
+    svc.flush()
+
+    task_service.update_task_attrs(task.id, notes="Nota nova")
+
+    svc.refresh(task)
+    assert task.notes == "Nota nova"
