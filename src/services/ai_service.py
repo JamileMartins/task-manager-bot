@@ -238,6 +238,45 @@ def suggest_next_step(task_title: str) -> str:
         return "Dar o primeiro passo"
 
 
+def transcrever_audio(audio_bytes: bytes, mime_type: str = "audio/ogg") -> str:
+    """Transcreve áudio via Gemini multimodal. Retorna '' em caso de falha."""
+    if not GEMINI_API_KEY:
+        return ""
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[
+                        types.Part(
+                            inline_data=types.Blob(
+                                mime_type=mime_type,
+                                data=audio_bytes,
+                            )
+                        ),
+                        types.Part(
+                            text=(
+                                "Transcreva o áudio para texto em português do Brasil. "
+                                "Retorne apenas o texto transcrito, sem aspas, sem comentários, "
+                                "sem formatação. Se não houver fala audível, retorne vazio."
+                            )
+                        ),
+                    ],
+                )
+            ],
+            config=types.GenerateContentConfig(
+                temperature=0.0,
+                max_output_tokens=1024,
+            ),
+        )
+        return (response.text or "").strip()
+    except Exception:
+        logger.exception("Erro ao transcrever áudio via Gemini")
+        return ""
+
+
 def classificar_brain_dump(
     texto: str,
     listas: list[str],

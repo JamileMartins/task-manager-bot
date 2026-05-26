@@ -7,6 +7,19 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não lançado]
 
+## [1.8.0] — 2026-05-26 — Transcrição de áudio via Gemini
+
+### Adicionado
+
+- **Captura por voz:** mensagens de voz (e arquivos de áudio) enviados ao bot são transcritos pelo Gemini e entram no fluxo normal de brain dump — mesmo resumo, mesma aprovação em bloco.
+- Transcrito exibido antes da classificação: `🎙️ Ouvi: "..."` para que a usuária possa verificar o que foi capturado.
+- Fallback explícito se transcrição falhar ou retornar vazio: `MSG_AUDIO_ERRO` pede para digitar.
+- `ai_service.transcrever_audio()` — chamada Gemini multimodal com `inline_data` para OGG/OPUS e outros formatos de áudio.
+- `handlers/audio.py` — handler independente registrado antes do catch-all de texto.
+- `capture.process_text_capture()` — lógica de captura extraída em função pública reutilizável.
+
+---
+
 ## [1.7.0] — 2026-05-26 — Medicações: horário, dia da semana e histórico
 
 ### Adicionado
@@ -30,14 +43,17 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ## [1.6.0] — 2026-05-26 — F6: Captura direta, visão geral e medicações
 
 ### Adicionado
+
 - **US-30** — Botão `➕ Adicionar` na tela de qualquer lista: cria tarefa diretamente sem passar pela IA, com confirmação e botão desfazer.
 - **US-31** — Comando `/tudo`: exibe todas as tarefas abertas agrupadas por lista (Inbox primeiro). Tarefas `aguardando` aparecem com ⏳. Se total > 30, limita a 5 por grupo.
 - **US-32** — Comando `/medicacoes`: checklist de medicações diárias e semanais da lista Saúde, com botão ✅ por item e fluxo guiado `➕ Nova medicação` (nome → frequência).
 
 ### Infraestrutura
+
 - Alembic configurado com migração inicial (`0001_initial_schema`); startup usa `alembic upgrade head`.
 
 ### Renomeado
+
 - Bot renomeado de "Foco" para "Task Manager".
 
 ---
@@ -45,14 +61,17 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ## [1.5.0] — 2026-05-25 — F5: Casal, busca e polimento
 
 ### Adicionado
+
 - **US-19** — Comando `/casal`: envia tarefas da lista Casa (casal) para o grupo configurado.
 - **US-19** — Comando `/setgrupo`: registra o grupo do Telegram como destino das tarefas de casal.
 - **US-22** — Comando `/buscar <termo>`: busca por palavra-chave no título e nas notas de todas as tarefas ativas.
 
 ### Corrigido
+
 - **US-29** — `cb_rev_wait_seguir` agora reinicia o contador `waiting_since` ao escolher "Seguir esperando" na revisão.
 
 ### Melhorado
+
 - Substituído "Jamile" por "usuária" em todos os textos e fallbacks do código.
 - Referências à API do Claude corrigidas para Google Gemini API.
 
@@ -61,6 +80,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ## [1.4.0] — 2026-05 — F4: Rituais, impedimentos e recorrência
 
 ### Adicionado
+
 - **US-15** — Resumo diário automático com tarefas do dia e focos Q1/Q2.
 - **US-16** — Revisão semanal automática: tarefas paradas há N dias com opções reagendar / arquivar / manter.
 - **US-17** — Lembretes por horário via `due_at` (job a cada minuto).
@@ -75,6 +95,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ## [1.3.0] — 2026-05 — F3: Priorização e /agora
 
 ### Adicionado
+
 - **US-07** — Detalhe de tarefa com edição inline de quadrante, energia, tempo estimado, prazo e recorrência.
 - **US-08** — Edição de quadrante (Q1–Q4) direto no detalhe.
 - **US-09** — Edição de energia (alta / média / baixa).
@@ -87,6 +108,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ## [1.2.0] — 2026-05 — F2: Classificação por IA
 
 ### Adicionado
+
 - **US-02** — Brain dump: múltiplas tarefas em uma mensagem, separadas e classificadas pela IA (Google Gemini).
 - **US-03** — Aprovação em bloco: "✅ Aprovar tudo" ou ajuste item a item.
 - **US-04** — Triagem da Inbox: itens com baixa confiança ficam na Inbox para organização manual.
@@ -96,6 +118,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ## [1.1.0] — 2026-05 — F1: Núcleo
 
 ### Adicionado
+
 - **US-01** — Captura de tarefa em texto livre → Inbox automático.
 - **US-05** — Listagem de listas com contagem de tarefas abertas.
 - **US-06** — Criar, renomear e arquivar listas.
@@ -109,6 +132,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ## [1.0.0] — 2026-05 — Estrutura inicial
 
 ### Adicionado
+
 - Scaffolding do projeto: estrutura de pastas, modelos SQLAlchemy, sessão com pool, configuração Railway.
 - Modelos: `users`, `lists`, `tasks`, `reminders`, `config`.
 - Documentação inicial: PRD, especificação técnica, histórias de usuário, prompt de IA, textos do bot.

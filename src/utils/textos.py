@@ -574,6 +574,24 @@ def msg_busca(tasks: list, term: str) -> str:
 # /medicacoes (US-32)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Áudio / voz
+# ---------------------------------------------------------------------------
+
+MSG_AUDIO_ERRO = (
+    "Não consegui entender o áudio 🎙️\n"
+    "Pode digitar o que você disse?"
+)
+
+
+def msg_audio_ouvi(texto: str) -> str:
+    return f"🎙️ Ouvi:\n\"{texto}\"\n\nOrganizando..."
+
+
+# ---------------------------------------------------------------------------
+# /medicacoes (US-32)
+# ---------------------------------------------------------------------------
+
 MSG_MED_VAZIA = (
     "Nenhuma medicação cadastrada ainda 💊\n\n"
     "Toque em ➕ Nova medicação para adicionar a primeira."

@@ -90,6 +90,7 @@ from src.handlers.lists import (
     cmd_listas,
     list_conversation,
 )
+from src.handlers.audio import handle_voice
 from src.handlers.medicacoes import cmd_medicacoes, medicacoes_conversation
 from src.handlers.task_detail import (
     cb_task_detail,
@@ -221,6 +222,9 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(cb_archive_list, pattern=r"^archive_list:"))
     app.add_handler(CallbackQueryHandler(cb_do_archive, pattern=r"^do_archive:"))
     app.add_handler(CallbackQueryHandler(cb_cancel_mgmt, pattern=r"^cancel_mgmt$"))
+
+    # Voz e áudio — antes do catch-all de texto
+    app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
 
     # Captura por texto livre — deve ser o último handler de mensagens
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_capture))

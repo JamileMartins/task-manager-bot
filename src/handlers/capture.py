@@ -47,24 +47,22 @@ def _clear_pending(context: ContextTypes.DEFAULT_TYPE) -> None:
 # Captura (entrada de texto livre)
 # ---------------------------------------------------------------------------
 
-async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not is_authorized(update):
-        await deny_unauthorized(update)
-        return
+async def process_text_capture(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    text: str,
+) -> None:
+    """Classifica texto como brain dump e envia resumo para aprovação.
 
-    text = (update.message.text or "").strip()
-    if not text:
-        return
-
-    await update.message.reply_chat_action(ChatAction.TYPING)
-
+    Reutilizado por handle_capture (texto) e handle_voice (áudio transcrito).
+    """
+    msg = update.effective_message
     chat_id = update.effective_chat.id
-    user_name = update.effective_user.full_name or "usuária"
+    user_name = (update.effective_user.full_name or "usuária") if update.effective_user else "usuária"
 
     try:
         listas_info = await asyncio.to_thread(task_service.get_user_lists, chat_id)
         if not listas_info:
-            # Usuária ainda não tem listas — cria usuário agora
             await asyncio.to_thread(task_service.get_or_create_user, chat_id, user_name)
             listas_info = await asyncio.to_thread(task_service.get_user_lists, chat_id)
 
@@ -76,23 +74,31 @@ async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
 
         _set_pending(context, tarefas, listas_dicts)
-
-        resumo = textos.msg_classificacao_resumo(tarefas)
-        await update.message.reply_text(
-            resumo,
+        await msg.reply_text(
+            textos.msg_classificacao_resumo(tarefas),
             reply_markup=keyboards.kb_classificacao_resumo(),
         )
     except Exception:
         logger.exception("Erro ao classificar captura")
-        # Fallback: salvar tudo na Inbox sem classificação
         try:
-            await asyncio.to_thread(
-                task_service.create_task_in_inbox, chat_id, text, user_name
-            )
-            await update.message.reply_text(textos.MSG_CAPTURA_FALLBACK)
+            await asyncio.to_thread(task_service.create_task_in_inbox, chat_id, text, user_name)
+            await msg.reply_text(textos.MSG_CAPTURA_FALLBACK)
         except Exception:
             logger.exception("Erro também no fallback de captura")
-            await update.message.reply_text(textos.MSG_ERRO_GENERICO)
+            await msg.reply_text(textos.MSG_ERRO_GENERICO)
+
+
+async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_authorized(update):
+        await deny_unauthorized(update)
+        return
+
+    text = (update.message.text or "").strip()
+    if not text:
+        return
+
+    await update.message.reply_chat_action(ChatAction.TYPING)
+    await process_text_capture(update, context, text)
 
 
 # ---------------------------------------------------------------------------

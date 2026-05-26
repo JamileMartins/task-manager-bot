@@ -5,7 +5,9 @@ import json
 
 import pytest
 
-from src.services.ai_service import _tarefa_inbox, _normalizar, parse_resposta
+from unittest.mock import MagicMock, patch
+
+from src.services.ai_service import _tarefa_inbox, _normalizar, parse_resposta, transcrever_audio
 
 _LISTAS = frozenset({"Trabalho", "Saúde", "Casa (solo)", "Casa (casal)", "Ideias", "Projetos"})
 
@@ -226,3 +228,56 @@ def test_tarefa_inbox_preserva_texto():
 def test_tarefa_inbox_trunca_em_500():
     t = _tarefa_inbox("a" * 600)
     assert len(t["titulo"]) == 500
+
+
+# ---------------------------------------------------------------------------
+# transcrever_audio
+# ---------------------------------------------------------------------------
+
+def test_transcrever_audio_sem_api_key_retorna_vazio(monkeypatch):
+    monkeypatch.setattr("src.services.ai_service.GEMINI_API_KEY", "")
+    resultado = transcrever_audio(b"qualquer_coisa")
+    assert resultado == ""
+
+
+def test_transcrever_audio_retorna_texto_transcrito(monkeypatch):
+    monkeypatch.setattr("src.services.ai_service.GEMINI_API_KEY", "fake-key")
+    mock_response = MagicMock()
+    mock_response.text = "  comprar café e ligar pro dentista  "
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = mock_response
+    with patch("src.services.ai_service.genai.Client", return_value=mock_client):
+        resultado = transcrever_audio(b"audio_bytes", "audio/ogg")
+    assert resultado == "comprar café e ligar pro dentista"
+
+
+def test_transcrever_audio_retorna_vazio_se_response_none(monkeypatch):
+    monkeypatch.setattr("src.services.ai_service.GEMINI_API_KEY", "fake-key")
+    mock_response = MagicMock()
+    mock_response.text = None
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = mock_response
+    with patch("src.services.ai_service.genai.Client", return_value=mock_client):
+        resultado = transcrever_audio(b"audio_bytes")
+    assert resultado == ""
+
+
+def test_transcrever_audio_retorna_vazio_em_excecao(monkeypatch):
+    monkeypatch.setattr("src.services.ai_service.GEMINI_API_KEY", "fake-key")
+    with patch("src.services.ai_service.genai.Client", side_effect=RuntimeError("erro")):
+        resultado = transcrever_audio(b"audio_bytes")
+    assert resultado == ""
+
+
+def test_transcrever_audio_passa_mime_type_correto(monkeypatch):
+    monkeypatch.setattr("src.services.ai_service.GEMINI_API_KEY", "fake-key")
+    mock_response = MagicMock()
+    mock_response.text = "texto"
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = mock_response
+    with patch("src.services.ai_service.genai.Client", return_value=mock_client):
+        transcrever_audio(b"bytes", "audio/mpeg")
+    call_kwargs = mock_client.models.generate_content.call_args
+    contents = call_kwargs.kwargs.get("contents") or call_kwargs.args[1]
+    blob = contents[0].parts[0].inline_data
+    assert blob.mime_type == "audio/mpeg"
