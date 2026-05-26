@@ -1002,30 +1002,49 @@ def get_daily_summary_tasks(chat_id: int) -> tuple[list[Task], list[Task]]:
 
 
 def get_tomorrow_tasks(chat_id: int) -> list[Task]:
-    """Tarefas abertas com prazo no dia de amanhã."""
-    import pytz
+    """Tarefas abertas com prazo amanhã — inclui recorrentes ainda abertas hoje."""
+    from sqlalchemy import and_
     with get_session() as session:
         user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
         if user is None:
             return []
 
-        tz = pytz.timezone(user.timezone or "America/Fortaleza")
+        tz = ZoneInfo(user.timezone or "America/Fortaleza")
         now_local = datetime.now(tz)
         tomorrow = now_local + timedelta(days=1)
+        tomorrow_dow = tomorrow.weekday()
         day_start = tomorrow.replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = tomorrow.replace(hour=23, minute=59, second=59, microsecond=999999)
+        today_end = now_local.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-        return list(session.scalars(
+        tasks = list(session.scalars(
             select(Task)
             .options(selectinload(Task.task_list))
             .where(
                 Task.user_id == user.id,
                 Task.status == "aberta",
-                Task.due_at >= day_start,
-                Task.due_at <= day_end,
+                or_(
+                    # Tarefas com due_at explícito amanhã
+                    and_(Task.due_at >= day_start, Task.due_at <= day_end),
+                    # Diárias abertas com due_at hoje ou antes (ainda não concluídas)
+                    and_(Task.recurrence == "daily", Task.due_at.is_not(None),
+                         Task.due_at <= today_end),
+                    # Semanais com dia da semana = amanhã, ainda abertas hoje ou antes
+                    and_(Task.recurrence == f"weekly:{tomorrow_dow}",
+                         Task.due_at.is_not(None), Task.due_at <= today_end),
+                ),
             )
             .order_by(Task.due_at, Task.quadrant.nullslast(), Task.sort_order)
         ).all())
+
+        # Remove duplicatas (recorrente já com due_at amanhã apareceria nos dois primeiros ramos)
+        seen: set[uuid.UUID] = set()
+        result = []
+        for t in tasks:
+            if t.id not in seen:
+                seen.add(t.id)
+                result.append(t)
+        return result
 
 
 def get_stale_tasks(chat_id: int) -> list[Task]:
