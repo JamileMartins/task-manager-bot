@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import random
 
+from src.version import __version__
+
 
 def _pick(*variants: str) -> str:
     return random.choice(variants)
@@ -44,7 +46,8 @@ MSG_AJUDA = (
     "🔄 /reiniciar — reiniciar o bot\n\n"
     "📖 /quadrantes — o que significam Q1, Q2, Q3, Q4 e como uso a energia\n\n"
     "Dica: você quase nunca precisa de comando. "
-    "Só me manda o que vier na cabeça."
+    "Só me manda o que vier na cabeça.\n\n"
+    f"Task Manager v{__version__}"
 )
 
 MSG_GUIA_QUADRANTES = (
@@ -86,7 +89,7 @@ def msg_ping(agora: str) -> str:
     return f"Funcionando ✅ — {agora}"
 
 
-MSG_REINICIANDO = "Reiniciando... 🔄"
+MSG_REINICIANDO = f"Reiniciando Task Manager v{__version__}... 🔄"
 
 
 # ---------------------------------------------------------------------------

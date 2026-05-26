@@ -1,11 +1,13 @@
 """Testes das mensagens centralizadas (utils/textos.py)."""
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
 
 from src.utils import textos
+from src.version import __version__
 
 
 def _mock_task(**kwargs):
@@ -21,6 +23,8 @@ def _mock_task(**kwargs):
         "due_at": None,
         "recurrence": None,
         "next_step": None,
+        "notes": None,
+        "completed_at": None,
     }
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)
@@ -464,3 +468,122 @@ def test_msg_busca_aguardando_mostra_icone():
     task = _mock_task(title="Aguardando", status="aguardando", task_list=None)
     resultado = textos.msg_busca([task], "aguardando")
     assert "⏳" in resultado
+
+
+# ---------------------------------------------------------------------------
+# Versão
+# ---------------------------------------------------------------------------
+
+def test_versao_no_ajuda():
+    assert __version__ in textos.MSG_AJUDA
+
+
+def test_versao_no_reiniciando():
+    assert __version__ in textos.MSG_REINICIANDO
+
+
+def test_versao_formato_semver():
+    partes = __version__.split(".")
+    assert len(partes) == 3
+    assert all(p.isdigit() for p in partes)
+
+
+# ---------------------------------------------------------------------------
+# F6 — msg_medicacoes / msg_med_ok
+# ---------------------------------------------------------------------------
+
+def _mock_med(title, recurrence="daily", notes=None, completed_at=None):
+    return SimpleNamespace(
+        title=title,
+        recurrence=recurrence,
+        notes=notes,
+        completed_at=completed_at,
+    )
+
+
+def test_medicacoes_lista_daily():
+    t = _mock_med("Puran T4")
+    resultado = textos.msg_medicacoes([t], [])
+    assert "Puran T4" in resultado
+    assert "Hoje" in resultado
+
+
+def test_medicacoes_exibe_horario():
+    t = _mock_med("Atentah", notes="08:00")
+    resultado = textos.msg_medicacoes([t], [])
+    assert "08:00" in resultado
+    assert "⏰" in resultado
+
+
+def test_medicacoes_sem_horario_nao_exibe_relogio():
+    t = _mock_med("Citobê")
+    resultado = textos.msg_medicacoes([t], [])
+    assert "⏰" not in resultado
+
+
+def test_medicacoes_semanal_sem_dia():
+    t = _mock_med("Citobê", recurrence="weekly")
+    resultado = textos.msg_medicacoes([], [t])
+    assert "Citobê" in resultado
+    assert "Semanal" in resultado
+
+
+def test_medicacoes_semanal_com_dia():
+    t = _mock_med("Citobê", recurrence="weekly:1")  # Terça
+    resultado = textos.msg_medicacoes([], [t])
+    assert "Terça" in resultado
+
+
+@pytest.mark.parametrize("dow,nome", [
+    (0, "Segunda"), (1, "Terça"), (2, "Quarta"),
+    (3, "Quinta"), (4, "Sexta"), (5, "Sábado"), (6, "Domingo"),
+])
+def test_medicacoes_semanal_todos_os_dias(dow, nome):
+    t = _mock_med("Med", recurrence=f"weekly:{dow}")
+    resultado = textos.msg_medicacoes([], [t])
+    assert nome in resultado
+
+
+def test_medicacoes_tomadas_hoje_exibe_horario():
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo("America/Fortaleza")
+    completed = datetime(2026, 5, 26, 11, 30, tzinfo=timezone.utc)
+    t = _mock_med("Puran T4", completed_at=completed)
+    resultado = textos.msg_medicacoes([], [], completed_hoje=[t])
+    assert "Tomadas hoje" in resultado
+    assert "Puran T4" in resultado
+
+
+def test_medicacoes_vazia_sem_secao_tomadas():
+    resultado = textos.msg_medicacoes([], [], completed_hoje=None)
+    assert "Tomadas hoje" not in resultado
+
+
+def test_med_ok_diaria_sem_horario():
+    resultado = textos.msg_med_ok("Puran T4", "daily")
+    assert "diária" in resultado
+    assert "✅" in resultado
+
+
+def test_med_ok_diaria_com_horario():
+    resultado = textos.msg_med_ok("Puran T4", "daily", med_time="08:00")
+    assert "08:00" in resultado
+
+
+def test_med_ok_semanal_com_dia():
+    resultado = textos.msg_med_ok("Citobê", "weekly:1", dow=1)
+    assert "Terça" in resultado
+    assert "semanal" in resultado.lower()
+
+
+@pytest.mark.parametrize("constante", [
+    "MSG_MED_VAZIA",
+    "MSG_MED_PEDIR_NOME",
+    "MSG_MED_PEDIR_HORARIO",
+    "MSG_MED_PEDIR_FREQ",
+    "MSG_MED_PEDIR_DIA",
+])
+def test_constantes_medicacoes_nao_vazias(constante):
+    valor = getattr(textos, constante)
+    assert isinstance(valor, str)
+    assert valor.strip() != ""

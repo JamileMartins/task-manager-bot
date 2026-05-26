@@ -1,4 +1,4 @@
-# Foco — Bot de Tarefas para Telegram
+# Task Manager — Bot de Tarefas para Telegram
 
 Um "segundo cérebro" de tarefas no Telegram, **mono-usuário**, projetado para baixo atrito e apoio a funções executivas (TDAH). Captura por brain dump, classificação assistida por IA, Matriz de Eisenhower, sugestão de "o que fazer agora", sistema de impedimentos e rituais de revisão.
 
@@ -8,12 +8,14 @@ Um "segundo cérebro" de tarefas no Telegram, **mono-usuário**, projetado para 
 
 - **Seus segredos não vão para o Git.** O `.gitignore` bloqueia o `.env` (que guarda tokens e a URL do banco). Só o `.env.example`, com campos vazios, é versionado.
 - **Seus dados (tarefas) não ficam no código** — ficam no seu banco (Supabase), separado do repositório.
-- **Antes do primeiro commit**, rode `git status` e confirme que `.env` **não** aparece. Se um segredo já tiver sido commitado alguma vez, ele permanece no histórico do Git: revogue e gere novos tokens (BotFather, Anthropic, Supabase).
+- **Antes do primeiro commit**, rode `git status` e confirme que `.env` **não** aparece. Se um segredo já tiver sido commitado alguma vez, ele permanece no histórico do Git: revogue e gere novos tokens (BotFather, Google, Supabase).
 - Quem clonar este repositório **não** acessa seus dados: precisa criar as próprias contas e a própria instância.
 
 ## Stack
 
-Python 3.11+ · python-telegram-bot v21+ · PostgreSQL (Supabase) · SQLAlchemy + Alembic · API Anthropic (Claude) · APScheduler · Railway/Fly.io.
+Python 3.11+ · python-telegram-bot v21+ · PostgreSQL (Supabase) · SQLAlchemy + Alembic · Google Gemini API · APScheduler · Railway/Fly.io.
+
+> **Sobre o uso de IA:** o bot usa a **Google Gemini API** para classificar tarefas em tempo de execução. O **Claude Code** (Anthropic) foi usado como assistente de desenvolvimento — ele não é uma dependência do bot em produção.
 
 ---
 
@@ -28,16 +30,16 @@ Estas instruções servem tanto para a autora quanto para quem clonou o reposit�
 | [@BotFather](https://t.me/BotFather) no Telegram | Criar seu bot | `TELEGRAM_BOT_TOKEN` |
 | [@userinfobot](https://t.me/userinfobot) no Telegram | Descobrir seu chat_id | `AUTHORIZED_CHAT_ID` |
 | [Supabase](https://supabase.com) | Banco PostgreSQL gerenciado | `DATABASE_URL` (com `?sslmode=require`) |
-| [Anthropic Console](https://console.anthropic.com) | Classificação por IA | `ANTHROPIC_API_KEY` |
+| [Google AI Studio](https://aistudio.google.com) | Classificação de tarefas por IA | `GEMINI_API_KEY` |
 | [Railway](https://railway.app) ou [Fly.io](https://fly.io) | Hospedar 24/7 (opcional no início) | — |
 
 ### 2. Clonar e configurar
 
 ```bash
 git clone <url-do-seu-fork>
-cd foco-bot
+cd task-manager-bot
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt        # disponível após a Fase F1
+pip install -r requirements.txt
 cp .env.example .env                   # preencha com SEUS valores
 ```
 

@@ -7,6 +7,26 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não lançado]
 
+## [1.7.0] — 2026-05-26 — Medicações: horário, dia da semana e histórico
+
+### Adicionado
+
+- **Horário aproximado por medicação:** fluxo de criação pergunta o horário (ex: `08:00`) após o nome; exibido com ⏰ no `/medicacoes`. Campo é preservado nas renovações automáticas.
+- **Dia da semana para medicações semanais:** recorrência semanal agora inclui o dia (`weekly:N`); fluxo de criação apresenta botões Seg–Dom. Exibido como "• Citobê — Terça ⏰ 20:00".
+- **Histórico de tomadas do dia:** `/medicacoes` exibe seção "✅ Tomadas hoje" com horário exato de cada medicação concluída no dia.
+- **Número de versão:** aparece no `/ajuda` e na mensagem do `/reiniciar`.
+
+### Corrigido
+
+- `complete_task` agora gera próxima ocorrência correta para recorrências no formato `weekly:N`.
+- Migração Alembic com múltiplos heads (`001` e `0001`) removida; mantido apenas `0001_initial_schema` com verificações idempotentes.
+
+### Infraestrutura
+
+- `src/version.py` centraliza `__version__` consumido pelos textos do bot.
+
+---
+
 ## [1.6.0] — 2026-05-26 — F6: Captura direta, visão geral e medicações
 
 ### Adicionado
