@@ -79,6 +79,7 @@ from src.handlers.common import (
     cmd_reiniciar,
     cmd_setgrupo,
     cmd_start,
+    cmd_tudo,
     error_handler,
 )
 from src.handlers.lists import (
@@ -137,6 +138,7 @@ def main() -> None:
     app.add_handler(CommandHandler("casal", cmd_casal))
     app.add_handler(CommandHandler("buscar", cmd_buscar))
     app.add_handler(CommandHandler("setgrupo", cmd_setgrupo))
+    app.add_handler(CommandHandler("tudo", cmd_tudo))
 
     # ConversationHandler de listas (antes do capture handler)
     app.add_handler(list_conversation)

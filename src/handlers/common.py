@@ -181,6 +181,39 @@ async def cmd_setgrupo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 # ---------------------------------------------------------------------------
+# /tudo (US-31)
+# ---------------------------------------------------------------------------
+
+async def cmd_tudo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_authorized(update):
+        await deny_unauthorized(update)
+        return
+    msg = update.effective_message
+    if not msg:
+        return
+    try:
+        await msg.reply_chat_action(ChatAction.TYPING)
+        chat_id = update.effective_chat.id
+        groups = await asyncio.to_thread(task_service.get_all_open_tasks, chat_id)
+
+        if not groups:
+            await msg.reply_text(textos.MSG_TUDO_VAZIA)
+            return
+
+        total = sum(len(g.tasks) for g in groups)
+        limit = 5 if total > 30 else None
+
+        for group in groups:
+            tasks = group.tasks[:limit] if limit else group.tasks
+            emoji = "📥" if group.slug is None else textos.lista_emoji(group.slug)
+            texto = textos.msg_tudo_header(group.name, emoji, len(tasks), len(group.tasks))
+            await msg.reply_text(texto, reply_markup=keyboards.kb_tudo_group(tasks))
+    except Exception:
+        logger.exception("Erro em /tudo")
+        await msg.reply_text(textos.MSG_ERRO_GENERICO)
+
+
+# ---------------------------------------------------------------------------
 # /buscar (US-22)
 # ---------------------------------------------------------------------------
 

@@ -34,6 +34,7 @@ MSG_AJUDA = (
     "📋 /listas — ver e mexer nas suas listas\n"
     "📂 /ver <lista> — abrir uma lista\n"
     "📨 /inbox — o que ainda não organizei direito\n"
+    "🗂️ /tudo — todas as tarefas abertas de uma vez\n"
     "☀️ /hoje — seus focos de hoje\n"
     "👫 /casal — mandar as tarefas de casa pro grupo\n"
     "🔍 /buscar <palavra> — achar uma tarefa\n"
@@ -557,6 +558,21 @@ def msg_busca(tasks: list, term: str) -> str:
         status_icon = "⏳" if t.status == "aguardando" else "◾"
         lines.append(f"{status_icon} {t.title}\n   → {lista}")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# /tudo (US-31)
+# ---------------------------------------------------------------------------
+
+MSG_TUDO_VAZIA = "Nenhuma tarefa aberta no momento 🎉\nTudo limpo por aqui."
+
+
+def msg_tudo_header(nome: str, emoji: str, n_visivel: int, n_total: int) -> str:
+    s = "" if n_total == 1 else "s"
+    header = f"{emoji} {nome} — {n_total} tarefa{s}"
+    if n_visivel < n_total:
+        header += f"\n(mostrando {n_visivel}, +{n_total - n_visivel} mais)"
+    return header
 
 
 # ---------------------------------------------------------------------------

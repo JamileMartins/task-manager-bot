@@ -113,6 +113,21 @@ def kb_ajustar_tarefa(
     return InlineKeyboardMarkup(rows)
 
 
+def kb_tudo_group(tasks: Sequence[Task]) -> InlineKeyboardMarkup:
+    """Keyboard para um grupo do /tudo — ✅ apenas para tarefas abertas; ⏳ sem botão para aguardando."""
+    rows = []
+    for task in tasks:
+        title = task.title[:32] + "…" if len(task.title) > 32 else task.title
+        if task.status == "aguardando":
+            rows.append([InlineKeyboardButton(f"⏳ {title}", callback_data=f"task_dt:{task.id}")])
+        else:
+            rows.append([
+                InlineKeyboardButton(title, callback_data=f"task_dt:{task.id}"),
+                InlineKeyboardButton("✅", callback_data=f"complete_task:{task.id}"),
+            ])
+    return InlineKeyboardMarkup(rows)
+
+
 def kb_inbox(tasks: Sequence[Task]) -> InlineKeyboardMarkup:
     """Título da tarefa (→ detalhe) + ✅ por linha para a Inbox."""
     rows = []

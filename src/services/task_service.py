@@ -185,6 +185,14 @@ class ListInfo:
     open_task_count: int
 
 
+@dataclass
+class TaskGroup:
+    name: str
+    slug: Optional[str]
+    list_id: Optional[uuid.UUID]
+    tasks: list[Task]
+
+
 def get_user_lists(chat_id: int) -> list[ListInfo]:
     """Retorna listas ativas com contagem de tarefas abertas."""
     with get_session() as session:
@@ -293,6 +301,48 @@ def search_tasks(chat_id: int, term: str) -> list[Task]:
             .order_by(Task.status, Task.quadrant.nullslast(), Task.sort_order)
             .limit(20)
         ).all())
+
+
+def get_all_open_tasks(chat_id: int) -> list[TaskGroup]:
+    """Retorna todas as tarefas abertas/aguardando agrupadas por lista (Inbox primeiro)."""
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return []
+
+        inbox_tasks = list(session.scalars(
+            select(Task)
+            .where(
+                Task.user_id == user.id,
+                Task.list_id.is_(None),
+                Task.status.in_(["aberta", "aguardando"]),
+            )
+            .order_by(Task.sort_order, Task.created_at)
+        ).all())
+
+        lists = list(session.scalars(
+            select(TaskList)
+            .where(TaskList.user_id == user.id, TaskList.archived.is_(False))
+            .order_by(TaskList.sort_order)
+        ).all())
+
+        groups: list[TaskGroup] = []
+        if inbox_tasks:
+            groups.append(TaskGroup(name="Inbox", slug=None, list_id=None, tasks=inbox_tasks))
+
+        for lst in lists:
+            tasks = list(session.scalars(
+                select(Task)
+                .where(
+                    Task.list_id == lst.id,
+                    Task.status.in_(["aberta", "aguardando"]),
+                )
+                .order_by(Task.quadrant.nullslast(), Task.sort_order)
+            ).all())
+            if tasks:
+                groups.append(TaskGroup(name=lst.name, slug=lst.slug, list_id=lst.id, tasks=tasks))
+
+        return groups
 
 
 def create_list(chat_id: int, name: str) -> Optional[TaskList]:
