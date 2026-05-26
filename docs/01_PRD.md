@@ -181,6 +181,9 @@ Tarefa parada raramente é "preguiça": quase sempre há um **impedimento** não
 | RF28 | O brain dump detecta dependências na captura e marca a tarefa como "aguardando" quando identifica impedimento externo. | Should |
 | RF29 | O usuário pode resolver um impedimento (desbloquear), retornando a tarefa ao status "aberta". | Must |
 | RF30 | A revisão semanal inclui uma seção de "esperas longas": tarefas em status "aguardando" há mais de N dias, oferecendo para cada uma: cobrar agora, desbloquear, arquivar ou seguir esperando. | Should |
+| RF31 | A tela de uma lista tem botão "➕ Adicionar" que cria tarefa naquela lista diretamente, sem passar pela classificação IA. | Must |
+| RF32 | Comando `/tudo` exibe todas as tarefas abertas agrupadas por lista, em uma única mensagem. | Should |
+| RF33 | Comando `/medicacoes` exibe tarefas recorrentes (diárias e semanais) da lista Saúde com botões de conclusão rápida, e oferece fluxo guiado para criar nova medicação com recorrência. | Should |
 
 ---
 
@@ -256,6 +259,8 @@ Tarefa parada raramente é "preguiça": quase sempre há um **impedimento** não
 | /inbox | Ver itens não triados |
 | /hoje | Focos do dia sob demanda |
 | /casal | Exportar tarefas de casal para o grupo |
+| /tudo | Ver todas as tarefas abertas agrupadas por lista |
+| /medicacoes | Checklist de medicações recorrentes (diárias e semanais) |
 | /buscar `<termo>` | Buscar tarefas |
 | /config | Configurar horários, fuso, grupo de casal |
 | /ajuda | Lista de comandos |

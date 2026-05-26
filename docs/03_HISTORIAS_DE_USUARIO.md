@@ -225,7 +225,7 @@
   - /casal formata as tarefas abertas da lista de casal.
   - Envia a mensagem ao grupo configurado em /config.
   - Se o grupo não estiver configurado, o bot orienta como configurar.
-- Prioridade: Should · Fase: F5 · **Status: ❌ Pendente**
+- Prioridade: Should · Fase: F5 · **Status: ✅ Feito**
 
 ### US-20 — Configurações
 
@@ -254,7 +254,7 @@
 - Refs: RF18
 - **CA:**
   - /buscar termo retorna tarefas que contêm o termo no título/notas.
-- Prioridade: Could · Fase: F5 · **Status: ❌ Pendente**
+- Prioridade: Could · Fase: F5 · **Status: ✅ Feito**
 
 ---
 
@@ -338,6 +338,46 @@
 
 ---
 
+## Épico 8 — Captura direta, visão geral e saúde
+
+### US-30 — Adicionar tarefa diretamente em uma lista
+
+**Como** a usuária, **quero** adicionar uma tarefa numa lista específica com um toque, **para** não passar pela classificação IA quando já sei onde a tarefa vai.
+
+- Refs: RF31
+- **CA:**
+  - Na tela de qualquer lista (via /listas), há um botão "➕ Adicionar".
+  - Ao tocar, o bot pede o título da tarefa.
+  - A tarefa é criada diretamente naquela lista, com status "aberta", sem chamar a IA.
+  - O bot confirma com o nome da lista e botão de desfazer.
+- Prioridade: Must · Fase: F6 · **Status: ❌ Pendente**
+
+### US-31 — Ver todas as tarefas de uma vez
+
+**Como** a usuária, **quero** um comando que mostre tudo de todas as listas em uma tela, **para** ter uma visão geral do que está aberto.
+
+- Refs: RF32
+- **CA:**
+  - /tudo exibe todas as tarefas abertas agrupadas por lista (Inbox primeiro, depois listas em ordem).
+  - Cada grupo mostra o nome da lista e as tarefas com botão ✅.
+  - Se o total ultrapassar 30 itens, cada lista mostra as 5 primeiras com indicação de quantas restam.
+  - Tarefas em status "aguardando" aparecem com marcador ⏳ mas não têm botão ✅ (apenas link para detalhe).
+- Prioridade: Should · Fase: F6 · **Status: ❌ Pendente**
+
+### US-32 — Checklist de medicações diárias e semanais
+
+**Como** a usuária, **quero** um checklist das minhas medicações do dia/semana, **para** não esquecer de tomar e confirmar rapidamente que tomei.
+
+- Refs: RF33
+- **CA:**
+  - /medicacoes exibe duas seções: "Hoje" (recorrência diária, da lista Saúde) e "Esta semana" (recorrência semanal, da lista Saúde).
+  - Cada medicação tem botão ✅ para marcar como tomada; ao concluir, cria automaticamente a próxima ocorrência (via recorrência já implementada).
+  - Há botão "➕ Nova medicação" que guia: pede nome → frequência (Diária / Semanal) → cria a tarefa com recorrência e due_at a partir de hoje.
+  - Se não houver medicações cadastradas, orienta como criar.
+- Prioridade: Should · Fase: F6 · **Status: ❌ Pendente**
+
+---
+
 ## Resumo de priorização e status
 
 | Fase | Histórias | Status |
@@ -347,3 +387,4 @@
 | F3 | US-07, US-08, US-09, US-10, US-11, US-12 | ✅ Completa |
 | F4 | US-14, US-15, US-16, US-17, US-18, US-20, US-23, US-24, US-25, US-26, US-27, US-28, US-29 | ✅ Completa |
 | F5 | US-19, US-22 | ✅ Completa |
+| F6 | US-30, US-31, US-32 | ❌ Pendente |
