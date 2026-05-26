@@ -243,7 +243,10 @@ def transcrever_audio(audio_bytes: bytes, mime_type: str = "audio/ogg") -> str:
     if not GEMINI_API_KEY:
         return ""
     try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
+        client = genai.Client(
+            api_key=GEMINI_API_KEY,
+            http_options=types.HttpOptions(timeout=90),
+        )
         response = client.models.generate_content(
             model=GEMINI_MODEL,
             contents=[

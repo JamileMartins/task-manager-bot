@@ -36,9 +36,26 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     else:
         return
 
-    audio_bytes = bytes(await tg_file.download_as_bytearray())
+    try:
+        audio_bytes = bytes(await tg_file.download_as_bytearray())
+    except Exception:
+        logger.exception("Erro ao baixar áudio do Telegram")
+        await msg.reply_text(textos.MSG_AUDIO_ERRO)
+        return
 
-    texto = await asyncio.to_thread(ai_service.transcrever_audio, audio_bytes, mime_type)
+    try:
+        texto = await asyncio.wait_for(
+            asyncio.to_thread(ai_service.transcrever_audio, audio_bytes, mime_type),
+            timeout=120.0,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("Timeout na transcrição de áudio (120s)")
+        await msg.reply_text(textos.MSG_AUDIO_ERRO)
+        return
+    except Exception:
+        logger.exception("Erro na transcrição de áudio")
+        await msg.reply_text(textos.MSG_AUDIO_ERRO)
+        return
 
     if not texto:
         await msg.reply_text(textos.MSG_AUDIO_ERRO)
