@@ -87,8 +87,19 @@ async def cb_blocker_type(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
 
     elif blocker_type == "aversiva_energia":
-        await asyncio.to_thread(task_service.update_task_attrs, task_id, energy="alta")
-        await query.edit_message_text(textos.MSG_BLOCKER_AVERSIVA)
+        # Reduz estimativa para deixar a tarefa mais acessível (se > 30 min, divide pela metade)
+        new_estimate = None
+        if task.estimate_min and task.estimate_min > 30:
+            new_estimate = max(15, task.estimate_min // 2)
+            await asyncio.to_thread(
+                task_service.update_task_attrs, task_id, energy="alta", estimate_min=new_estimate
+            )
+        else:
+            await asyncio.to_thread(task_service.update_task_attrs, task_id, energy="alta")
+        await query.edit_message_text(
+            textos.msg_blocker_aversiva(new_estimate),
+            parse_mode="Markdown",
+        )
 
     elif blocker_type == "pessoa":
         await query.edit_message_text(

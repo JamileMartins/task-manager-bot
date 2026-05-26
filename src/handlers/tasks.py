@@ -15,6 +15,40 @@ from src.utils import keyboards, textos
 logger = logging.getLogger(__name__)
 
 
+async def cmd_ver(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/ver <lista> — abre uma lista pelo nome ou parte do nome."""
+    if not is_authorized(update):
+        await deny_unauthorized(update)
+        return
+
+    msg = update.effective_message
+    term = " ".join(context.args).strip() if context.args else ""
+    if not term:
+        await msg.reply_text("Use /ver seguido do nome da lista. Ex.: /ver Trabalho")
+        return
+
+    chat_id = update.effective_chat.id
+    try:
+        lst = await asyncio.to_thread(task_service.find_list_by_term, chat_id, term)
+        if lst is None:
+            await msg.reply_text(
+                f'Não encontrei nenhuma lista com "{term}". Use /listas para ver todas.'
+            )
+            return
+
+        tasks = await asyncio.to_thread(task_service.get_tasks_for_list, lst.id)
+        if not tasks:
+            texto = textos.MSG_LISTA_VAZIA.format(nome=lst.name)
+        else:
+            n = len(tasks)
+            texto = f"📋 {lst.name} — {n} {'tarefa' if n == 1 else 'tarefas'}"
+
+        await msg.reply_text(texto, reply_markup=keyboards.kb_tasks(tasks, list_id=lst.id))
+    except Exception:
+        logger.exception("Erro ao ver lista por termo '%s'", term)
+        await msg.reply_text(textos.MSG_ERRO_GENERICO)
+
+
 async def cb_view_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()

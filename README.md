@@ -26,7 +26,7 @@ Estas instruções servem tanto para a autora quanto para quem clonou o reposit�
 ### 1. Pré-requisitos (crie as suas próprias contas)
 
 | Serviço | Para quê | O que você obtém |
-|---------|----------|------------------|
+| ------- | -------- | ---------------- |
 | [@BotFather](https://t.me/BotFather) no Telegram | Criar seu bot | `TELEGRAM_BOT_TOKEN` |
 | [@userinfobot](https://t.me/userinfobot) no Telegram | Descobrir seu chat_id | `AUTHORIZED_CHAT_ID` |
 | [Supabase](https://supabase.com) | Banco PostgreSQL gerenciado | `DATABASE_URL` (com `?sslmode=require`) |

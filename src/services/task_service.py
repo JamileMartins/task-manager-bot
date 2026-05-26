@@ -267,6 +267,30 @@ def get_inbox_count(chat_id: int) -> int:
         ) or 0
 
 
+def find_list_by_term(chat_id: int, term: str) -> Optional[TaskList]:
+    """Busca lista pelo slug (exato) ou nome (contém, sem acento). Retorna a primeira correspondência."""
+    slug_term = _slugify(term)
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return None
+        lists = list(session.scalars(
+            select(TaskList).where(TaskList.user_id == user.id, TaskList.archived.is_(False))
+        ).all())
+        # Preferência: match exato de slug; depois: slug contém; depois: nome contém (sem acento)
+        for lst in lists:
+            if lst.slug == slug_term:
+                return lst
+        for lst in lists:
+            if slug_term in (lst.slug or ""):
+                return lst
+        term_lower = term.lower()
+        for lst in lists:
+            if term_lower in lst.name.lower():
+                return lst
+        return None
+
+
 def get_tasks_for_list(list_id: uuid.UUID) -> list[Task]:
     with get_session() as session:
         return session.scalars(
@@ -418,11 +442,25 @@ def create_medicacao(chat_id: int, title: str, recurrence: str, med_time: str | 
 
 
 def get_all_open_tasks(chat_id: int) -> list[TaskGroup]:
-    """Retorna todas as tarefas abertas/aguardando agrupadas por lista (Inbox primeiro)."""
+    """Retorna todas as tarefas abertas/aguardando agrupadas por lista (Inbox primeiro).
+
+    Tarefas recorrentes com due_at no futuro (próxima ocorrência já agendada) são
+    omitidas — só aparecem quando chegarem na data delas.
+    """
     with get_session() as session:
         user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
         if user is None:
             return []
+
+        tz = ZoneInfo("America/Fortaleza")
+        today_end = datetime.now(tz).replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        # Tarefas recorrentes com due_at > hoje ficam ocultas (são ocorrências futuras)
+        not_future_recurrence = or_(
+            Task.recurrence.is_(None),
+            Task.due_at.is_(None),
+            Task.due_at <= today_end,
+        )
 
         inbox_tasks = list(session.scalars(
             select(Task)
@@ -430,6 +468,7 @@ def get_all_open_tasks(chat_id: int) -> list[TaskGroup]:
                 Task.user_id == user.id,
                 Task.list_id.is_(None),
                 Task.status.in_(["aberta", "aguardando"]),
+                not_future_recurrence,
             )
             .order_by(Task.sort_order, Task.created_at)
         ).all())
@@ -450,6 +489,7 @@ def get_all_open_tasks(chat_id: int) -> list[TaskGroup]:
                 .where(
                     Task.list_id == lst.id,
                     Task.status.in_(["aberta", "aguardando"]),
+                    not_future_recurrence,
                 )
                 .order_by(Task.quadrant.nullslast(), Task.sort_order)
             ).all())
@@ -1004,6 +1044,21 @@ def mark_reminder_sent(reminder_id: uuid.UUID) -> None:
         r = session.get(Reminder, reminder_id)
         if r:
             r.sent = True
+
+
+def get_due_waiting_tasks() -> list[tuple[Task, int]]:
+    """Retorna tarefas 'aguardando' cuja due_at já passou (gatilho de retomada por data)."""
+    with get_session() as session:
+        rows = session.execute(
+            select(Task, User.telegram_chat_id)
+            .join(User, User.id == Task.user_id)
+            .where(
+                Task.status == "aguardando",
+                Task.due_at.isnot(None),
+                Task.due_at <= _now(),
+            )
+        ).all()
+        return [(t, chat_id) for t, chat_id in rows]
 
 
 def reorder_task(task_id: str | uuid.UUID, direction: str) -> bool:

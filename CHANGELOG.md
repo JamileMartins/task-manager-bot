@@ -7,6 +7,26 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não lançado]
 
+## [1.10.0] — 2026-05-26 — Correções de lacunas e polimento
+
+### Corrigido
+
+- **`/tudo` exibia medicações do dia seguinte** — tarefas recorrentes com `due_at` depois de hoje ficam ocultas; só aparecem quando chegar a data delas (`get_all_open_tasks`).
+- **Lembrete da cobrança (US-25) nunca era salvo** — `cb_blocker_cobrar_date` calculava `remind_at` mas não persistia. `create_related_task` agora aceita `due_at` e o `Reminder` é criado corretamente.
+- **`aversiva_energia` não reduzia estimativa** — se `estimate_min > 30`, o valor é dividido pela metade (mínimo 15 min) para tornar a tarefa mais acessível. Mensagem reformulada com dica de parear com algo agradável.
+
+### Adicionado
+
+- **Desbloqueio automático por data (US-28 CA)** — `get_due_waiting_tasks()` detecta tarefas `aguardando` cujo `due_at` passou; o job `send_reminders` (a cada minuto) as desbloqueia automaticamente e notifica a usuária.
+- **Comando `/ver <lista>`** — abre qualquer lista pelo nome ou parte do nome (ex.: `/ver trabalho`, `/ver casa`). Busca por slug exato → slug contém → nome contém.
+
+### Infraestrutura
+
+- Markdownlint corrigido em `CLAUDE.md` (MD031, MD032) e `README.md` (MD060).
+- 19 novos testes unitários cobrindo as funções adicionadas/corrigidas.
+
+---
+
 ## [1.9.0] — 2026-05-26 — /hoje e /amanhã
 
 ### Adicionado

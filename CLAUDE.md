@@ -46,6 +46,7 @@ Implemente uma fase por vez. Ao final de cada fase, rode os testes e confirme os
 ## Modelo de dados (resumo)
 
 Tabelas: `users`, `lists`, `tasks`, `reminders`, `config`. Detalhes completos em `docs/02_ESPECIFICACAO_TECNICA.md` seção 3. Pontos-chave:
+
 - `tasks.list_id` nulo = Inbox.
 - `tasks.quadrant` 1–4 (Eisenhower), nulo = não classificado.
 - `tasks.energy` em {alta, media, baixa}; `tasks.estimate_min` em minutos.
@@ -60,9 +61,11 @@ Tarefa parada tem causa nomeável. O sistema distingue impedimento **interno** (
 ## Contrato do serviço de IA
 
 A IA recebe texto livre + listas existentes + data/fuso e responde **somente JSON**:
+
 ```json
 {"tarefas":[{"titulo":"...","lista_sugerida":"...","quadrante_sugerido":1,"prazo_sugerido":null,"estimativa_min":15,"energia":"baixa","impedimento":null,"impedimento_externo":false,"proximo_passo":null,"confianca":0.9}]}
 ```
+
 Regras: uma chamada por brain dump; parsing seguro; `confianca` baixa → Inbox; falha → salvar texto como uma tarefa na Inbox. **O prompt completo de produção, com regras de cada campo, exemplos few-shot e pós-processamento, está em `docs/04_PROMPT_CLASSIFICACAO_IA.md` — leia antes de implementar a F2.**
 
 ## Lógica "/agora"

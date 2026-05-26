@@ -1694,3 +1694,207 @@ def test_search_tasks_encontra_por_notas(svc):
 
     assert len(resultado) == 1
     assert resultado[0].id == t.id
+
+
+# ---------------------------------------------------------------------------
+# v1.10.0 — get_all_open_tasks: oculta recorrentes futuras (bug /tudo)
+# ---------------------------------------------------------------------------
+
+def test_get_all_open_tasks_oculta_recorrente_futura(svc):
+    """/tudo não deve mostrar medicação de amanhã (próxima ocorrência recorrente)."""
+    user = _user(svc)
+    lst = _list(svc, user, name="Saude")
+    now = datetime.now(timezone.utc)
+    amanha = now + timedelta(days=1)
+
+    # Tarefa recorrente com due_at amanhã (já foi concluída hoje, nova ocorrência criada)
+    t_rec = _task_f3(svc, user, title="Remedio amanha", list_id=lst.id,
+                     due_at=amanha, status="aberta")
+    t_rec.recurrence = "daily"
+    svc.flush()
+    _task_f3(svc, user, title="Tarefa sem recorrencia", list_id=lst.id)
+
+    groups = task_service.get_all_open_tasks(user.telegram_chat_id)
+
+    titulos = [t.title for g in groups for t in g.tasks]
+    assert "Remedio amanha" not in titulos
+    assert "Tarefa sem recorrencia" in titulos
+
+
+def test_get_all_open_tasks_mostra_recorrente_hoje(svc):
+    """Tarefa recorrente com due_at hoje deve aparecer no /tudo."""
+    user = _user(svc)
+    lst = _list(svc, user, name="Saude")
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo("America/Fortaleza")
+    hoje_meio_dia = datetime.now(tz).replace(hour=12, minute=0, second=0, microsecond=0)
+
+    t = _task_f3(svc, user, title="Remedio hoje", list_id=lst.id, due_at=hoje_meio_dia)
+    t.recurrence = "daily"
+    svc.flush()
+
+    groups = task_service.get_all_open_tasks(user.telegram_chat_id)
+
+    titulos = [task.title for g in groups for task in g.tasks]
+    assert "Remedio hoje" in titulos
+
+
+def test_get_all_open_tasks_mostra_nao_recorrente_com_prazo_futuro(svc):
+    """Tarefa normal (sem recorrência) com prazo futuro ainda aparece no /tudo."""
+    user = _user(svc)
+    lst = _list(svc, user, name="Trabalho")
+    futuro = datetime.now(timezone.utc) + timedelta(days=7)
+
+    _task_f3(svc, user, title="Entrega semana que vem", list_id=lst.id, due_at=futuro)
+
+    groups = task_service.get_all_open_tasks(user.telegram_chat_id)
+
+    titulos = [t.title for g in groups for t in g.tasks]
+    assert "Entrega semana que vem" in titulos
+
+
+# ---------------------------------------------------------------------------
+# v1.10.0 — get_due_waiting_tasks: desbloqueio automático por data
+# ---------------------------------------------------------------------------
+
+def test_get_due_waiting_tasks_retorna_aguardando_vencida(svc):
+    user = _user(svc)
+    passado = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    t = _task(svc, user)
+    t.status = "aguardando"
+    t.due_at = passado
+    t.waiting_since = passado
+    svc.flush()
+
+    result = task_service.get_due_waiting_tasks()
+
+    ids = [task.id for task, _ in result]
+    assert t.id in ids
+
+
+def test_get_due_waiting_tasks_nao_retorna_futuras(svc):
+    user = _user(svc)
+    futuro = datetime(2099, 12, 31, tzinfo=timezone.utc)
+    t = _task(svc, user)
+    t.status = "aguardando"
+    t.due_at = futuro
+    t.waiting_since = datetime.now(timezone.utc)
+    svc.flush()
+
+    result = task_service.get_due_waiting_tasks()
+
+    ids = [task.id for task, _ in result]
+    assert t.id not in ids
+
+
+def test_get_due_waiting_tasks_nao_retorna_sem_due_at(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+    t.status = "aguardando"
+    t.waiting_since = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    svc.flush()
+
+    result = task_service.get_due_waiting_tasks()
+
+    ids = [task.id for task, _ in result]
+    assert t.id not in ids
+
+
+def test_get_due_waiting_tasks_nao_retorna_tarefas_abertas(svc):
+    user = _user(svc)
+    passado = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    t = _task(svc, user)
+    t.status = "aberta"
+    t.due_at = passado
+    svc.flush()
+
+    result = task_service.get_due_waiting_tasks()
+
+    ids = [task.id for task, _ in result]
+    assert t.id not in ids
+
+
+def test_get_due_waiting_tasks_inclui_chat_id(svc):
+    user = _user(svc, chat_id=88888)
+    passado = datetime(2020, 6, 1, tzinfo=timezone.utc)
+    t = _task(svc, user)
+    t.status = "aguardando"
+    t.due_at = passado
+    t.waiting_since = passado
+    svc.flush()
+
+    result = task_service.get_due_waiting_tasks()
+
+    match = next((entry for entry in result if entry[0].id == t.id), None)
+    assert match is not None
+    assert match[1] == 88888
+
+
+# ---------------------------------------------------------------------------
+# v1.10.0 — find_list_by_term: /ver <lista>
+# ---------------------------------------------------------------------------
+
+def test_find_list_by_term_slug_exato(svc):
+    user = _user(svc)
+    _list(svc, user, name="Trabalho")
+
+    result = task_service.find_list_by_term(user.telegram_chat_id, "trabalho")
+
+    assert result is not None
+    assert result.name == "Trabalho"
+
+
+def test_find_list_by_term_nome_parcial(svc):
+    user = _user(svc)
+    _list(svc, user, name="Casa (solo)")
+
+    result = task_service.find_list_by_term(user.telegram_chat_id, "solo")
+
+    assert result is not None
+    assert "solo" in result.name.lower()
+
+
+def test_find_list_by_term_case_insensitive(svc):
+    user = _user(svc)
+    _list(svc, user, name="Saúde")
+
+    result = task_service.find_list_by_term(user.telegram_chat_id, "SAÚDE")
+
+    assert result is not None
+    assert result.name == "Saúde"
+
+
+def test_find_list_by_term_sem_acento(svc):
+    user = _user(svc)
+    _list(svc, user, name="Saúde")
+
+    result = task_service.find_list_by_term(user.telegram_chat_id, "saude")
+
+    assert result is not None
+    assert result.name == "Saúde"
+
+
+def test_find_list_by_term_nao_encontrado_retorna_none(svc):
+    user = _user(svc)
+    _list(svc, user, name="Trabalho")
+
+    result = task_service.find_list_by_term(user.telegram_chat_id, "inexistente")
+
+    assert result is None
+
+
+def test_find_list_by_term_usuario_inexistente_retorna_none(svc):
+    result = task_service.find_list_by_term(999888, "qualquer")
+
+    assert result is None
+
+
+def test_find_list_by_term_nao_retorna_arquivada(svc):
+    user = _user(svc)
+    lst = _list(svc, user, name="Arquivada")
+    lst.archived = True
+    svc.flush()
+
+    result = task_service.find_list_by_term(user.telegram_chat_id, "arquivada")
+
+    assert result is None

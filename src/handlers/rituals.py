@@ -14,6 +14,7 @@ from src.services.task_service import (
     get_config,
     get_daily_summary_tasks,
     get_due_reminders,
+    get_due_waiting_tasks,
     get_stale_tasks,
     get_stale_waiting_tasks,
     get_task_with_list,
@@ -34,6 +35,7 @@ from src.utils.textos import (
     MSG_DIARIO_VAZIO,
     MSG_REVISAO_ESPERAS_ABERTURA,
     MSG_REVISAO_NADA,
+    msg_auto_unblock,
     msg_diario_focos,
     msg_lembrete,
     msg_revisao_abertura,
@@ -60,7 +62,7 @@ def _rev_clear(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
 # ---------------------------------------------------------------------------
 
 async def send_reminders(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Job a cada minuto: dispara lembretes vencidos (US-17)."""
+    """Job a cada minuto: dispara lembretes vencidos (US-17) e desbloqueia tarefas aguardando por data (US-28)."""
     try:
         due = get_due_reminders()
     except Exception:
@@ -78,6 +80,23 @@ async def send_reminders(context: ContextTypes.DEFAULT_TYPE) -> None:
             mark_reminder_sent(reminder.id)
         except Exception:
             logger.exception("Erro ao enviar lembrete %s", reminder.id)
+
+    try:
+        waiting = get_due_waiting_tasks()
+    except Exception:
+        logger.exception("Erro ao buscar tarefas aguardando vencidas")
+        return
+
+    for task, chat_id in waiting:
+        try:
+            unblock_task(task.id)
+            await context.bot.send_message(
+                chat_id,
+                msg_auto_unblock(task.title),
+                parse_mode="Markdown",
+            )
+        except Exception:
+            logger.exception("Erro ao desbloquear tarefa %s por data", task.id)
 
 
 async def send_daily_summary(context: ContextTypes.DEFAULT_TYPE) -> None:

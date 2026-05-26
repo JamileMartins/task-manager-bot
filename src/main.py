@@ -110,6 +110,7 @@ from src.handlers.tasks import (
     cb_complete_task,
     cb_view_inbox,
     cb_view_list,
+    cmd_ver,
 )
 
 logging.basicConfig(
@@ -143,6 +144,7 @@ def main() -> None:
     app.add_handler(CommandHandler("buscar", cmd_buscar))
     app.add_handler(CommandHandler("setgrupo", cmd_setgrupo))
     app.add_handler(CommandHandler("tudo", cmd_tudo))
+    app.add_handler(CommandHandler("ver", cmd_ver))
     app.add_handler(CommandHandler("medicacoes", cmd_medicacoes))
     app.add_handler(CommandHandler("hoje", cmd_hoje))
     app.add_handler(CommandHandler("amanha", cmd_amanha))

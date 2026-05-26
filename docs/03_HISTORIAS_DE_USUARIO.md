@@ -290,8 +290,8 @@
 - **CA:**
   - Ao escolher impedimento "pessoa", recebo dois botões: "Aguardando" e "Criar cobrança com lembrete".
   - "Aguardando" muda o status e remove a tarefa do /agora e dos focos do dia.
-  - "Criar cobrança" gera tarefa "cobrar fulano" com lembrete na data que eu definir.
-- Prioridade: Must · Fase: F4 · **Status: ✅ Feito**
+  - "Criar cobrança" gera tarefa "cobrar fulano" com `due_at` e `Reminder` na data escolhida.
+- Prioridade: Must · Fase: F4 · **Status: ✅ Feito** (lembrete corrigido em v1.10.0)
 
 ### US-26 — Decisão pendente e recurso faltante
 
@@ -321,8 +321,8 @@
 - **CA:**
   - Na tarefa bloqueada, há botão "Desbloquear".
   - Ao desbloquear, o status volta para "aberta" e a tarefa reentra no /agora.
-  - Gatilhos automáticos (data atingida, cobrança concluída) também desbloqueiam.
-- Prioridade: Must · Fase: F4 · **Status: ✅ Feito**
+  - Gatilho automático por data: job a cada minuto desbloqueia tarefas `aguardando` cujo `due_at` passou e notifica a usuária.
+- Prioridade: Must · Fase: F4 · **Status: ✅ Feito** (auto-desbloqueio por data adicionado em v1.10.0)
 
 ### US-29 — Revisar esperas longas
 
@@ -381,7 +381,7 @@
 ## Resumo de priorização e status
 
 | Fase | Histórias | Status |
-| --- | --- | --- |
+| ---- | --------- | ------ |
 | F1 | US-01, US-05, US-06, US-13, US-21 | ✅ Completa |
 | F2 | US-02, US-03, US-04 | ✅ Completa |
 | F3 | US-07, US-08, US-09, US-10, US-11, US-12 | ✅ Completa |

@@ -397,10 +397,19 @@ def msg_blocker_cobrar_ok(data: str) -> str:
     return f"Feito 🔔 Vou te lembrar de cobrar em {data}."
 
 
-MSG_BLOCKER_AVERSIVA = (
-    "Entendi, essa pesa. Guardei pra quando você tiver mais energia ⚡\n"
-    "Só aparece no /agora quando você marcar energia alta."
-)
+def msg_blocker_aversiva(estimate_min: int | None) -> str:
+    estimate_info = (
+        f" Reduzi o tempo estimado para {estimate_min} min para parecer menos pesada."
+        if estimate_min
+        else ""
+    )
+    return (
+        f"Entendi, essa pesa.{estimate_info}\n\n"
+        "Ela só vai aparecer no /agora quando você marcar *energia alta* — "
+        "assim você a faz num momento de pico ⚡\n\n"
+        "💡 Dica: parear com algo que você gosta (música, café, pausas) "
+        "pode ajudar bastante nesse tipo de tarefa."
+    )
 
 
 def msg_blocker_recurso(task_title: str) -> str:
@@ -426,6 +435,14 @@ MSG_BLOCKER_OBSOLETA = (
 MSG_BLOCKER_ARQUIVADA = "Arquivada sem culpa 🗑️"
 MSG_BLOCKER_KEEP = "Ok, mantida como está."
 MSG_UNBLOCK_OK = "Destravada ✅ Voltou pras suas tarefas ativas."
+
+
+def msg_auto_unblock(title: str) -> str:
+    return (
+        f"📬 *{title}*\n\n"
+        "Chegou a data que você estava esperando — voltei com essa tarefa pras suas ativas. "
+        "Quer dar uma olhada no /agora? 🙂"
+    )
 
 
 # ---------------------------------------------------------------------------
