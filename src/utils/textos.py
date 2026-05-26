@@ -153,6 +153,12 @@ MSG_LISTA_ARQUIVADA = '"{nome}" arquivada. As tarefas foram mantidas.'
 
 MSG_CANCELADO = "Cancelado."
 
+MSG_ADD_TASK_TITULO = "Qual o título da tarefa?"
+
+
+def msg_add_task_ok(list_name: str) -> str:
+    return f"Adicionado em {list_name} ✅"
+
 MSG_CONFIRMAR_ARQUIVAR = 'Arquivar "{nome}"? As tarefas ficam salvas mas a lista some do menu.'
 
 

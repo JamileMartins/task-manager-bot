@@ -72,9 +72,8 @@ def kb_tasks(tasks: Sequence[Task], list_id: uuid.UUID | None = None) -> InlineK
         ])
     nav_row = [InlineKeyboardButton("← Voltar", callback_data="back_to_lists")]
     if list_id is not None:
-        nav_row.append(
-            InlineKeyboardButton("⚙️ Gerenciar", callback_data=f"manage_list:{list_id}")
-        )
+        nav_row.append(InlineKeyboardButton("➕ Adicionar", callback_data=f"add_to_list:{list_id}"))
+        nav_row.append(InlineKeyboardButton("⚙️", callback_data=f"manage_list:{list_id}"))
     rows.append(nav_row)
     return InlineKeyboardMarkup(rows)
 

@@ -114,6 +114,27 @@ def create_task_in_inbox(chat_id: int, title: str, user_name: str = "usuária") 
         return task
 
 
+def create_task_in_list(chat_id: int, list_id: uuid.UUID, title: str) -> Task:
+    """Cria tarefa diretamente em uma lista, sem passar pela IA (US-30)."""
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            raise ValueError("Usuário não encontrado")
+        now = _now()
+        task = Task(
+            user_id=user.id,
+            list_id=list_id,
+            title=title,
+            status="aberta",
+            sort_order=0,
+            created_at=now,
+            last_touched_at=now,
+        )
+        session.add(task)
+        session.flush()
+        return task
+
+
 def delete_task(task_id: str | uuid.UUID) -> bool:
     uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
     with get_session() as session:

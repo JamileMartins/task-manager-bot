@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 # Estados da conversa
 _CREATE_NAME = 1
 _RENAME_NAME = 2
+_ADD_TASK_TITLE = 3
 
 
 # ---------------------------------------------------------------------------
@@ -201,6 +202,60 @@ async def cb_do_archive(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 # ---------------------------------------------------------------------------
+# Adicionar tarefa diretamente em lista (US-30)
+# ---------------------------------------------------------------------------
+
+async def cb_start_add_task(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return ConversationHandler.END
+
+    list_id_str = query.data.split(":")[1]
+    context.user_data["add_task_list_id"] = list_id_str
+
+    lists = await asyncio.to_thread(task_service.get_user_lists, update.effective_chat.id)
+    lista_info = next((l for l in lists if str(l.id) == list_id_str), None)
+    context.user_data["add_task_list_name"] = lista_info.name if lista_info else "lista"
+
+    await query.edit_message_text(textos.MSG_ADD_TASK_TITULO)
+    return _ADD_TASK_TITLE
+
+
+async def save_add_task(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if not is_authorized(update):
+        await deny_unauthorized(update)
+        return ConversationHandler.END
+
+    title = (update.message.text or "").strip()
+    if not title:
+        await update.message.reply_text(textos.MSG_ADD_TASK_TITULO)
+        return _ADD_TASK_TITLE
+
+    list_id_str = context.user_data.get("add_task_list_id", "")
+    list_name = context.user_data.get("add_task_list_name", "lista")
+    if not list_id_str:
+        await update.message.reply_text(textos.MSG_ERRO_GENERICO)
+        return ConversationHandler.END
+
+    try:
+        task = await asyncio.to_thread(
+            task_service.create_task_in_list,
+            update.effective_chat.id,
+            uuid.UUID(list_id_str),
+            title,
+        )
+        await update.message.reply_text(
+            textos.msg_add_task_ok(list_name),
+            reply_markup=keyboards.kb_undo_capture(task.id),
+        )
+    except Exception:
+        logger.exception("Erro ao adicionar tarefa na lista %s", list_id_str)
+        await update.message.reply_text(textos.MSG_ERRO_GENERICO)
+    return ConversationHandler.END
+
+
+# ---------------------------------------------------------------------------
 # Cancelar conversa
 # ---------------------------------------------------------------------------
 
@@ -221,10 +276,12 @@ list_conversation = ConversationHandler(
     entry_points=[
         CallbackQueryHandler(cb_start_new_list, pattern="^new_list$"),
         CallbackQueryHandler(cb_start_rename_list, pattern=r"^rename_list:"),
+        CallbackQueryHandler(cb_start_add_task, pattern=r"^add_to_list:"),
     ],
     states={
         _CREATE_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_new_list_name)],
         _RENAME_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_rename_list)],
+        _ADD_TASK_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_add_task)],
     },
     fallbacks=[CommandHandler("cancel", cmd_cancel)],
     per_message=False,
