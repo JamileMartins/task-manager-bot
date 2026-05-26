@@ -914,11 +914,21 @@ def test_update_task_ignora_campo_nao_permitido(svc):
     user = _user(svc)
     t = _task_f3(svc, user, title="Original")
 
-    task_service.update_task_attrs(t.id, title="Alterado", quadrant=1)
+    task_service.update_task_attrs(t.id, status="concluida", quadrant=1)
     svc.refresh(t)
 
-    assert t.title == "Original"
+    assert t.status == "aberta"
     assert t.quadrant == 1
+
+
+def test_update_task_atualiza_titulo(svc):
+    user = _user(svc)
+    t = _task_f3(svc, user, title="Titulo com erro de digitacao")
+
+    task_service.update_task_attrs(t.id, title="Titulo corrigido")
+    svc.refresh(t)
+
+    assert t.title == "Titulo corrigido"
 
 
 # ---------------------------------------------------------------------------
@@ -2013,3 +2023,56 @@ def test_conquistas_dias_ativos_varios_no_mesmo_dia(svc):
 
     assert stats["semana"] == 3
     assert stats["dias_ativos"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Subtarefas no detalhe (Sugestao 6)
+# ---------------------------------------------------------------------------
+
+def test_get_subtasks_retorna_subtarefas_abertas(svc):
+    user = _user(svc)
+    pai = _task(svc, user, title="Tarefa pai")
+    sub1 = _task(svc, user, title="Sub 1")
+    sub1.parent_task_id = pai.id
+    sub2 = _task(svc, user, title="Sub 2")
+    sub2.parent_task_id = pai.id
+    svc.flush()
+
+    resultado = task_service.get_subtasks(pai.id)
+
+    assert len(resultado) == 2
+    titulos = {t.title for t in resultado}
+    assert titulos == {"Sub 1", "Sub 2"}
+
+
+def test_get_subtasks_ignora_concluidas(svc):
+    user = _user(svc)
+    pai = _task(svc, user, title="Pai")
+    sub = _task(svc, user, title="Sub concluida", status="concluida")
+    sub.parent_task_id = pai.id
+    svc.flush()
+
+    resultado = task_service.get_subtasks(pai.id)
+
+    assert len(resultado) == 0
+
+
+def test_get_subtasks_sem_subtarefas_retorna_vazio(svc):
+    user = _user(svc)
+    task = _task(svc, user)
+
+    resultado = task_service.get_subtasks(task.id)
+
+    assert resultado == []
+
+
+def test_get_subtasks_aceita_string_uuid(svc):
+    user = _user(svc)
+    pai = _task(svc, user, title="Pai")
+    sub = _task(svc, user, title="Sub")
+    sub.parent_task_id = pai.id
+    svc.flush()
+
+    resultado = task_service.get_subtasks(str(pai.id))
+
+    assert len(resultado) == 1

@@ -319,7 +319,7 @@ _BLOCKER_LABEL: dict[str, str] = {
 }
 
 
-def msg_task_detail(task) -> str:
+def msg_task_detail(task, subtasks=None) -> str:
     import pytz
     lista_nome = task.task_list.name if task.task_list else "📥 Inbox"
     lines = [f"📋 {task.title}\n", f"📂 {lista_nome}"]
@@ -355,6 +355,12 @@ def msg_task_detail(task) -> str:
 
     if task.next_step:
         lines.append(f"💡 Próximo passo: {task.next_step}")
+    if subtasks:
+        lines.append(f"\n📌 Próximos passos ({len(subtasks)}):")
+        for s in subtasks:
+            est = f" · {s.estimate_min}min" if s.estimate_min else ""
+            lines.append(f"  • {s.title}{est}")
+
     if task.notes:
         lines.append(f"\n📝 {task.notes}")
     return "\n".join(lines)
@@ -369,6 +375,16 @@ def msg_nota_pergunta(task_title: str) -> str:
 
 MSG_NOTA_SALVA = "📝 Nota salva."
 MSG_NOTA_APAGADA = "🗑️ Nota removida."
+
+
+def msg_titulo_pergunta(task_title: str) -> str:
+    return (
+        f"✏️ Qual é o novo título?\n\n"
+        f"Atual: {task_title}"
+    )
+
+
+MSG_TITULO_SALVO = "✏️ Título atualizado."
 
 
 # ---------------------------------------------------------------------------

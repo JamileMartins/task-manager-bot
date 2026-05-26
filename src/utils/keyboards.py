@@ -181,7 +181,7 @@ def kb_inbox(tasks: Sequence[Task]) -> InlineKeyboardMarkup:
 # Detalhe de tarefa (F3)
 # ---------------------------------------------------------------------------
 
-def kb_task_detail(task: Task, listas: list[dict]) -> InlineKeyboardMarkup:
+def kb_task_detail(task: Task, listas: list[dict], subtasks=None) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
 
     if task.status == "aguardando":
@@ -226,8 +226,17 @@ def kb_task_detail(task: Task, listas: list[dict]) -> InlineKeyboardMarkup:
             InlineKeyboardButton("↑", callback_data=f"task_up:{task.id}"),
             InlineKeyboardButton("↓", callback_data=f"task_dn:{task.id}"),
         ])
+        if subtasks:
+            for s in subtasks[:5]:
+                rows.append([InlineKeyboardButton(
+                    f"✅ {s.title}", callback_data=f"sub_done:{s.id}:{task.id}"
+                )])
+
         nota_label = "📝 Nota ✓" if task.notes else "📝 Nota"
-        rows.append([InlineKeyboardButton(nota_label, callback_data=f"task_note:{task.id}")])
+        rows.append([
+            InlineKeyboardButton(nota_label, callback_data=f"task_note:{task.id}"),
+            InlineKeyboardButton("✏️ Título", callback_data=f"task_title:{task.id}"),
+        ])
 
     if task.list_id:
         rows.append([InlineKeyboardButton("← Voltar", callback_data=f"view_list:{task.list_id}")])
@@ -243,6 +252,12 @@ def kb_nota(task_id: str, has_notes: bool) -> InlineKeyboardMarkup:
         rows.append([InlineKeyboardButton("🗑️ Apagar nota", callback_data=f"task_note_del:{task_id}")])
     rows.append([InlineKeyboardButton("✖️ Cancelar", callback_data=f"task_note_cancel:{task_id}")])
     return InlineKeyboardMarkup(rows)
+
+
+def kb_cancelar(task_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("✖️ Cancelar", callback_data=f"task_title_cancel:{task_id}")
+    ]])
 
 
 def kb_mover_tarefa(task_id: str, listas: list[dict]) -> InlineKeyboardMarkup:

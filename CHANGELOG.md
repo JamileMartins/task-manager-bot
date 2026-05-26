@@ -7,6 +7,18 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não lançado]
 
+## [1.13.0] — 2026-05-26 — Subtarefas no detalhe e edição de título
+
+### Adicionado
+
+- **Subtarefas visíveis no detalhe (Sugestão #6)** — tarefa com subtarefas abertas exibe seção "📌 Próximos passos" com título e estimativa de cada uma. Botão `✅ <subtarefa>` em cada item conclui a subtarefa e refresca o detalhe sem sair da tela.
+- **Editar título de tarefa (Sugestão #9)** — botão `✏️ Título` no detalhe abre ConversationHandler simples: envia o novo texto → salvo em até 500 caracteres. Elimina a necessidade de arquivar e recriar uma tarefa para corrigir erro de digitação.
+- `get_subtasks(task_id)` — retorna subtarefas abertas de uma tarefa-pai em ordem de sort/criação.
+- `kb_cancelar(task_id)` — teclado genérico de cancelamento reutilizável.
+- `title_conversation` e `cb_sub_complete` em `handlers/task_detail.py`.
+- Campo `"title"` adicionado ao whitelist de `update_task_attrs`.
+- 5 novos testes para `get_subtasks`; 1 para edição de título; 1 teste existente corrigido.
+
 ## [1.12.0] — 2026-05-26 — Histórico de conquistas
 
 ### Adicionado

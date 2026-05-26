@@ -96,6 +96,7 @@ from src.handlers.lists import (
 from src.handlers.audio import handle_voice
 from src.handlers.medicacoes import cmd_medicacoes, medicacoes_conversation
 from src.handlers.task_detail import (
+    cb_sub_complete,
     cb_task_detail,
     cb_task_move_to,
     cb_task_reorder,
@@ -106,6 +107,7 @@ from src.handlers.task_detail import (
     cb_task_set_recurrence,
     cb_task_start_move,
     note_conversation,
+    title_conversation,
 )
 from src.handlers.tasks import (
     cb_back_to_lists,
@@ -153,6 +155,7 @@ def main() -> None:
     app.add_handler(CommandHandler("conquistas", cmd_conquistas))
 
     # ConversationHandlers (antes do capture handler)
+    app.add_handler(title_conversation)
     app.add_handler(note_conversation)
     app.add_handler(list_conversation)
     app.add_handler(medicacoes_conversation)
@@ -213,6 +216,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(cb_task_move_to, pattern=r"^mv:"))
     app.add_handler(CallbackQueryHandler(cb_task_reorder, pattern=r"^task_up:"))
     app.add_handler(CallbackQueryHandler(cb_task_reorder, pattern=r"^task_dn:"))
+    app.add_handler(CallbackQueryHandler(cb_sub_complete, pattern=r"^sub_done:"))
 
     # Navegação e tarefas
     app.add_handler(CallbackQueryHandler(cb_view_list, pattern=r"^view_list:"))

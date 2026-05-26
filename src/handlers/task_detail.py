@@ -20,8 +20,10 @@ logger = logging.getLogger(__name__)
 _MOVE_TASK_KEY = "move_task_id"
 _MOVE_LISTAS_KEY = "move_listas"
 _NOTE_TASK_KEY = "note_task_id"
+_TITLE_TASK_KEY = "title_task_id"
 
 _NOTE_TEXT = 1
+_TITLE_TEXT = 2
 
 
 # ---------------------------------------------------------------------------
@@ -30,13 +32,16 @@ _NOTE_TEXT = 1
 
 async def _refresh_detail(query, task_id: uuid.UUID, context: ContextTypes.DEFAULT_TYPE) -> None:
     listas = context.user_data.get(_MOVE_LISTAS_KEY, [])
-    task = await asyncio.to_thread(task_service.get_task_with_list, task_id)
+    task, subtasks = await asyncio.gather(
+        asyncio.to_thread(task_service.get_task_with_list, task_id),
+        asyncio.to_thread(task_service.get_subtasks, task_id),
+    )
     if task is None:
         await query.edit_message_text(textos.MSG_ERRO_GENERICO)
         return
     await query.edit_message_text(
-        textos.msg_task_detail(task),
-        reply_markup=keyboards.kb_task_detail(task, listas),
+        textos.msg_task_detail(task, subtasks),
+        reply_markup=keyboards.kb_task_detail(task, listas, subtasks),
     )
 
 
@@ -62,13 +67,16 @@ async def cb_task_detail(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     context.user_data[_MOVE_TASK_KEY] = str(task_id)
 
     try:
-        task = await asyncio.to_thread(task_service.get_task_with_list, task_id)
+        task, subtasks = await asyncio.gather(
+            asyncio.to_thread(task_service.get_task_with_list, task_id),
+            asyncio.to_thread(task_service.get_subtasks, task_id),
+        )
         if task is None:
             await query.edit_message_text(textos.MSG_ERRO_GENERICO)
             return
         await query.edit_message_text(
-            textos.msg_task_detail(task),
-            reply_markup=keyboards.kb_task_detail(task, listas_dicts),
+            textos.msg_task_detail(task, subtasks),
+            reply_markup=keyboards.kb_task_detail(task, listas_dicts, subtasks),
         )
     except Exception:
         logger.exception("Erro ao abrir detalhe da tarefa %s", task_id)
@@ -269,13 +277,16 @@ async def save_task_note(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     task_id = uuid.UUID(task_id_str)
     await asyncio.to_thread(task_service.update_task_attrs, task_id, notes=note_text)
 
-    task = await asyncio.to_thread(task_service.get_task_with_list, task_id)
+    task, subtasks = await asyncio.gather(
+        asyncio.to_thread(task_service.get_task_with_list, task_id),
+        asyncio.to_thread(task_service.get_subtasks, task_id),
+    )
     listas = context.user_data.get(_MOVE_LISTAS_KEY, [])
     await update.message.reply_text(textos.MSG_NOTA_SALVA)
     if task:
         await update.message.reply_text(
-            textos.msg_task_detail(task),
-            reply_markup=keyboards.kb_task_detail(task, listas),
+            textos.msg_task_detail(task, subtasks),
+            reply_markup=keyboards.kb_task_detail(task, listas, subtasks),
         )
     return ConversationHandler.END
 
@@ -291,10 +302,13 @@ async def cb_task_note_delete(update: Update, context: ContextTypes.DEFAULT_TYPE
     await asyncio.to_thread(task_service.update_task_attrs, task_id, notes=None)
 
     listas = context.user_data.get(_MOVE_LISTAS_KEY, [])
-    task = await asyncio.to_thread(task_service.get_task_with_list, task_id)
+    task, subtasks = await asyncio.gather(
+        asyncio.to_thread(task_service.get_task_with_list, task_id),
+        asyncio.to_thread(task_service.get_subtasks, task_id),
+    )
     await query.edit_message_text(
-        textos.MSG_NOTA_APAGADA + ("\n\n" + textos.msg_task_detail(task) if task else ""),
-        reply_markup=keyboards.kb_task_detail(task, listas) if task else None,
+        textos.MSG_NOTA_APAGADA + ("\n\n" + textos.msg_task_detail(task, subtasks) if task else ""),
+        reply_markup=keyboards.kb_task_detail(task, listas, subtasks) if task else None,
     )
     return ConversationHandler.END
 
@@ -328,4 +342,104 @@ note_conversation = ConversationHandler(
     fallbacks=[CommandHandler("cancel", _cmd_cancel_note)],
     per_message=False,
     name="note_editing",
+)
+
+
+# ---------------------------------------------------------------------------
+# Concluir subtarefa a partir do detalhe da tarefa-pai (Sugestão #6)
+# ---------------------------------------------------------------------------
+
+async def cb_sub_complete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+
+    parts = query.data.split(":")
+    subtask_id = uuid.UUID(parts[1])
+    parent_id = uuid.UUID(parts[2])
+
+    await asyncio.to_thread(task_service.complete_task, subtask_id)
+    await _refresh_detail(query, parent_id, context)
+
+
+# ---------------------------------------------------------------------------
+# Editar título de tarefa (Sugestão #9)
+# ---------------------------------------------------------------------------
+
+async def cb_task_title_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return ConversationHandler.END
+
+    task_id_str = query.data.split(":")[1]
+    context.user_data[_TITLE_TASK_KEY] = task_id_str
+
+    task = await asyncio.to_thread(task_service.get_task_with_list, uuid.UUID(task_id_str))
+    if task is None:
+        await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+        return ConversationHandler.END
+
+    await query.edit_message_text(
+        textos.msg_titulo_pergunta(task.title),
+        reply_markup=keyboards.kb_cancelar(task_id_str),
+    )
+    return _TITLE_TEXT
+
+
+async def save_task_title(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if not is_authorized(update):
+        return ConversationHandler.END
+
+    task_id_str = context.user_data.get(_TITLE_TASK_KEY)
+    if not task_id_str:
+        return ConversationHandler.END
+
+    novo_titulo = update.message.text.strip()[:500]
+    task_id = uuid.UUID(task_id_str)
+    await asyncio.to_thread(task_service.update_task_attrs, task_id, title=novo_titulo)
+
+    task, subtasks = await asyncio.gather(
+        asyncio.to_thread(task_service.get_task_with_list, task_id),
+        asyncio.to_thread(task_service.get_subtasks, task_id),
+    )
+    listas = context.user_data.get(_MOVE_LISTAS_KEY, [])
+    await update.message.reply_text(textos.MSG_TITULO_SALVO)
+    if task:
+        await update.message.reply_text(
+            textos.msg_task_detail(task, subtasks),
+            reply_markup=keyboards.kb_task_detail(task, listas, subtasks),
+        )
+    return ConversationHandler.END
+
+
+async def cb_task_title_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return ConversationHandler.END
+
+    task_id_str = query.data.split(":")[1]
+    task_id = uuid.UUID(task_id_str)
+    await _refresh_detail(query, task_id, context)
+    return ConversationHandler.END
+
+
+async def _cmd_cancel_title(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text("Edição de título cancelada.")
+    return ConversationHandler.END
+
+
+title_conversation = ConversationHandler(
+    entry_points=[CallbackQueryHandler(cb_task_title_start, pattern=r"^task_title:")],
+    states={
+        _TITLE_TEXT: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, save_task_title),
+            CallbackQueryHandler(cb_task_title_cancel, pattern=r"^task_title_cancel:"),
+        ],
+    },
+    fallbacks=[CommandHandler("cancel", _cmd_cancel_title)],
+    per_message=False,
+    name="title_editing",
 )

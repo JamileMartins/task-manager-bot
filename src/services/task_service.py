@@ -695,7 +695,7 @@ def get_lightest_task(
 
 def update_task_attrs(task_id: str | uuid.UUID, **kwargs) -> Optional[Task]:
     """Atualiza atributos de tarefa. Campos: quadrant, energy, estimate_min, due_at, list_id, next_step, recurrence."""
-    _allowed = {"quadrant", "energy", "estimate_min", "due_at", "list_id", "next_step", "recurrence", "notes"}
+    _allowed = {"quadrant", "energy", "estimate_min", "due_at", "list_id", "next_step", "recurrence", "notes", "title"}
     uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
     with get_session() as session:
         task = session.get(Task, uid)
@@ -803,6 +803,20 @@ def create_subtask(parent_task_id: str | uuid.UUID, title: str) -> Optional[Task
         session.add(subtask)
         session.flush()
         return subtask
+
+
+def get_subtasks(task_id: str | uuid.UUID) -> list[Task]:
+    """Retorna subtarefas abertas de uma tarefa-pai, em ordem de criação."""
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        return list(session.scalars(
+            select(Task)
+            .where(
+                Task.parent_task_id == uid,
+                Task.status == "aberta",
+            )
+            .order_by(Task.sort_order, Task.created_at)
+        ).all())
 
 
 def create_related_task(
