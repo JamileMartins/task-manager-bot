@@ -1937,3 +1937,79 @@ def test_update_task_attrs_sobrescreve_nota(svc):
 
     svc.refresh(task)
     assert task.notes == "Nota nova"
+
+
+# ---------------------------------------------------------------------------
+# Conquistas (Sugestao 3)
+# ---------------------------------------------------------------------------
+
+def test_conquistas_sem_tarefas_retorna_zeros(svc):
+    user = _user(svc)
+
+    stats = task_service.get_conquistas(user.telegram_chat_id)
+
+    assert stats["hoje"] == 0
+    assert stats["ontem"] == 0
+    assert stats["semana"] == 0
+    assert stats["dias_ativos"] == 0
+
+
+def test_conquistas_usuario_inexistente_retorna_zeros(svc):
+    stats = task_service.get_conquistas(999888777)
+
+    assert stats["semana"] == 0
+
+
+def test_conquistas_conta_tarefa_concluida_hoje(svc):
+    user = _user(svc)
+    task = _task(svc, user)
+    task.status = "concluida"
+    task.completed_at = datetime.now(timezone.utc)
+    svc.flush()
+
+    stats = task_service.get_conquistas(user.telegram_chat_id)
+
+    assert stats["hoje"] == 1
+    assert stats["semana"] == 1
+    assert stats["dias_ativos"] == 1
+
+
+def test_conquistas_conta_tarefa_concluida_ontem(svc):
+    user = _user(svc)
+    task = _task(svc, user)
+    task.status = "concluida"
+    task.completed_at = datetime.now(timezone.utc) - timedelta(days=1)
+    svc.flush()
+
+    stats = task_service.get_conquistas(user.telegram_chat_id)
+
+    assert stats["hoje"] == 0
+    assert stats["ontem"] == 1
+    assert stats["semana"] == 1
+
+
+def test_conquistas_ignora_tarefa_mais_de_7_dias(svc):
+    user = _user(svc)
+    task = _task(svc, user)
+    task.status = "concluida"
+    task.completed_at = datetime.now(timezone.utc) - timedelta(days=8)
+    svc.flush()
+
+    stats = task_service.get_conquistas(user.telegram_chat_id)
+
+    assert stats["semana"] == 0
+
+
+def test_conquistas_dias_ativos_varios_no_mesmo_dia(svc):
+    user = _user(svc)
+    agora = datetime.now(timezone.utc)
+    for _ in range(3):
+        t = _task(svc, user)
+        t.status = "concluida"
+        t.completed_at = agora
+        svc.flush()
+
+    stats = task_service.get_conquistas(user.telegram_chat_id)
+
+    assert stats["semana"] == 3
+    assert stats["dias_ativos"] == 1

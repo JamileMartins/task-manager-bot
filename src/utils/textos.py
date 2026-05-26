@@ -42,6 +42,7 @@ MSG_AJUDA = (
     "🌙 /amanha — o que tem prazo para amanhã\n"
     "👫 /casal — mandar as tarefas de casa pro grupo\n"
     "🔍 /buscar <palavra> — achar uma tarefa\n"
+    "🏆 /conquistas — ver o que você concluiu na semana\n"
     "⚙️ /config — horários e ajustes\n\n"
     "🏓 /ping — verificar se estou funcionando\n"
     "🔄 /reiniciar — reiniciar o bot\n\n"
@@ -531,6 +532,49 @@ def msg_amanha(tasks: list) -> str:
         lista = f" [{t.task_list.name}]" if t.task_list else ""
         lines.append(f"  • {t.title}{hora}{est}{lista}")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Conquistas — histórico de conclusões (Sugestão #3)
+# ---------------------------------------------------------------------------
+
+def msg_conquistas(stats: dict) -> str:
+    hoje = stats.get("hoje", 0)
+    ontem = stats.get("ontem", 0)
+    semana = stats.get("semana", 0)
+    dias = stats.get("dias_ativos", 0)
+
+    def _tarefas(n: int) -> str:
+        return "1 tarefa" if n == 1 else f"{n} tarefas"
+
+    lines = ["🏆 Suas conquistas\n"]
+
+    if hoje > 0:
+        lines.append(f"Hoje: {_tarefas(hoje)} concluídas ✅")
+    if ontem > 0:
+        lines.append(f"Ontem: {_tarefas(ontem)} concluídas ✅")
+    elif hoje == 0 and semana == 0:
+        lines.append("Ainda sem tarefas concluídas nos últimos 7 dias.")
+
+    if semana > 0:
+        lines.append(f"\nEsta semana (7 dias): {_tarefas(semana)} no total")
+        lines.append(f"Dias produtivos: {dias} de 7")
+
+    if semana >= 10:
+        lines.append("\nVocê está numa ótima fase. Continue assim!")
+    elif semana >= 5:
+        lines.append("\nBoa semana! Cada tarefa feita é progresso real.")
+    elif semana > 0:
+        lines.append("\nCada uma conta. Você está em movimento.")
+
+    return "\n".join(lines)
+
+
+def msg_conquistas_diario(ontem: int) -> str:
+    """Linha curta para o resumo matinal, só quando ontem > 0."""
+    if ontem == 1:
+        return "Ontem você concluiu 1 tarefa ✅"
+    return f"Ontem você concluiu {ontem} tarefas ✅"
 
 
 # ---------------------------------------------------------------------------

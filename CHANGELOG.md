@@ -7,6 +7,16 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não lançado]
 
+## [1.12.0] — 2026-05-26 — Histórico de conquistas
+
+### Adicionado
+
+- **`/conquistas`** — mostra tarefas concluídas hoje, ontem, nos últimos 7 dias e quantos dias produtivos houve na semana. Tom de reforço positivo gradual.
+- **Blurb no resumo matinal** — quando há conclusões de ontem, o bom-dia começa com "Ontem você concluiu X tarefas ✅" antes dos focos do dia.
+- `get_conquistas(chat_id)` — função de serviço retornando `{hoje, ontem, semana, dias_ativos}`.
+- `msg_conquistas(stats)` e `msg_conquistas_diario(ontem)` em `utils/textos.py`.
+- 6 novos testes unitários cobrindo todos os cenários de conquistas.
+
 ## [1.11.0] — 2026-05-26 — Nota em tarefa existente
 
 ### Adicionado

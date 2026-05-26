@@ -74,6 +74,7 @@ from src.handlers.common import (
     cmd_amanha,
     cmd_buscar,
     cmd_casal,
+    cmd_conquistas,
     cmd_hoje,
     cmd_inbox,
     cmd_ping,
@@ -149,6 +150,7 @@ def main() -> None:
     app.add_handler(CommandHandler("medicacoes", cmd_medicacoes))
     app.add_handler(CommandHandler("hoje", cmd_hoje))
     app.add_handler(CommandHandler("amanha", cmd_amanha))
+    app.add_handler(CommandHandler("conquistas", cmd_conquistas))
 
     # ConversationHandlers (antes do capture handler)
     app.add_handler(note_conversation)

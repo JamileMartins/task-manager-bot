@@ -167,6 +167,26 @@ async def cmd_amanha(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 # ---------------------------------------------------------------------------
+# /conquistas (Sugestão #3)
+# ---------------------------------------------------------------------------
+
+async def cmd_conquistas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_authorized(update):
+        await deny_unauthorized(update)
+        return
+    msg = update.effective_message
+    if not msg:
+        return
+    try:
+        await msg.reply_chat_action(ChatAction.TYPING)
+        stats = await asyncio.to_thread(task_service.get_conquistas, update.effective_chat.id)
+        await msg.reply_text(textos.msg_conquistas(stats))
+    except Exception:
+        logger.exception("Erro em /conquistas")
+        await msg.reply_text(textos.MSG_ERRO_GENERICO)
+
+
+# ---------------------------------------------------------------------------
 # /reiniciar
 # ---------------------------------------------------------------------------
 

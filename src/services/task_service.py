@@ -1086,3 +1086,56 @@ def reorder_task(task_id: str | uuid.UUID, direction: str) -> bool:
             return False
         task.sort_order, adjacent.sort_order = adjacent.sort_order, task.sort_order
         return True
+
+
+# ---------------------------------------------------------------------------
+# Conquistas — histórico de conclusões (Sugestão #3)
+# ---------------------------------------------------------------------------
+
+def get_conquistas(chat_id: int) -> dict:
+    """Retorna estatísticas de tarefas concluídas: hoje, ontem, semana e dias_ativos."""
+    from zoneinfo import ZoneInfo
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return {"hoje": 0, "ontem": 0, "semana": 0, "dias_ativos": 0}
+
+        tz = ZoneInfo(user.timezone or "America/Fortaleza")
+        now_local = datetime.now(tz)
+
+        hoje_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        ontem_start = hoje_start - timedelta(days=1)
+        semana_start = hoje_start - timedelta(days=6)
+
+        hoje_start_utc = hoje_start.astimezone(timezone.utc)
+        ontem_start_utc = ontem_start.astimezone(timezone.utc)
+        semana_start_utc = semana_start.astimezone(timezone.utc)
+
+        concluidas = list(session.scalars(
+            select(Task)
+            .where(
+                Task.user_id == user.id,
+                Task.status == "concluida",
+                Task.completed_at >= semana_start_utc,
+            )
+        ).all())
+
+        def _ct(t: Task) -> datetime:
+            dt = t.completed_at
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+        hoje = sum(1 for t in concluidas if _ct(t) >= hoje_start_utc)
+        ontem = sum(1 for t in concluidas if ontem_start_utc <= _ct(t) < hoje_start_utc)
+        semana = len(concluidas)
+
+        dias_com_conclusao: set[str] = set()
+        for t in concluidas:
+            dia = _ct(t).astimezone(tz).strftime("%Y-%m-%d")
+            dias_com_conclusao.add(dia)
+
+        return {
+            "hoje": hoje,
+            "ontem": ontem,
+            "semana": semana,
+            "dias_ativos": len(dias_com_conclusao),
+        }

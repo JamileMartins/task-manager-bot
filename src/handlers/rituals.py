@@ -12,6 +12,7 @@ from src.config import AUTHORIZED_CHAT_ID
 from src.services.task_service import (
     archive_task,
     get_config,
+    get_conquistas,
     get_daily_summary_tasks,
     get_due_reminders,
     get_due_waiting_tasks,
@@ -36,6 +37,7 @@ from src.utils.textos import (
     MSG_REVISAO_ESPERAS_ABERTURA,
     MSG_REVISAO_NADA,
     msg_auto_unblock,
+    msg_conquistas_diario,
     msg_diario_focos,
     msg_lembrete,
     msg_revisao_abertura,
@@ -102,10 +104,17 @@ async def send_reminders(context: ContextTypes.DEFAULT_TYPE) -> None:
 async def send_daily_summary(context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = context.job.data["chat_id"]
     today_tasks, focus_tasks = get_daily_summary_tasks(chat_id)
+    stats = get_conquistas(chat_id)
+
     if not today_tasks and not focus_tasks:
-        await context.bot.send_message(chat_id, MSG_DIARIO_VAZIO)
+        text = MSG_DIARIO_VAZIO
     else:
-        await context.bot.send_message(chat_id, msg_diario_focos(today_tasks, focus_tasks))
+        text = msg_diario_focos(today_tasks, focus_tasks)
+
+    if stats.get("ontem", 0) > 0:
+        text = msg_conquistas_diario(stats["ontem"]) + "\n\n" + text
+
+    await context.bot.send_message(chat_id, text)
 
 
 async def send_weekly_review(context: ContextTypes.DEFAULT_TYPE) -> None:
