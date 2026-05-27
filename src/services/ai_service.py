@@ -239,45 +239,80 @@ def suggest_next_step(task_title: str) -> str:
 
 
 def transcrever_audio(audio_bytes: bytes, mime_type: str = "audio/ogg") -> str:
-    """Transcreve áudio via Gemini multimodal. Retorna '' em caso de falha."""
+    """Transcreve áudio via Gemini Files API. Retorna '' em caso de falha."""
+    import io
+    import os
+    import tempfile
+
     if not GEMINI_API_KEY:
         return ""
+
+    ext = ".ogg" if "ogg" in mime_type else ".mp3"
+    tmp_path: str | None = None
     try:
         client = genai.Client(
             api_key=GEMINI_API_KEY,
-            http_options=types.HttpOptions(timeout=90),
+            http_options=types.HttpOptions(timeout=120),
         )
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=[
-                types.Content(
-                    role="user",
-                    parts=[
-                        types.Part(
-                            inline_data=types.Blob(
-                                mime_type=mime_type,
-                                data=audio_bytes,
-                            )
-                        ),
-                        types.Part(
-                            text=(
-                                "Transcreva o áudio para texto em português do Brasil. "
-                                "Retorne apenas o texto transcrito, sem aspas, sem comentários, "
-                                "sem formatação. Se não houver fala audível, retorne vazio."
-                            )
-                        ),
-                    ],
-                )
-            ],
-            config=types.GenerateContentConfig(
-                temperature=0.0,
-                max_output_tokens=1024,
-            ),
+
+        # Grava em arquivo temporário — Files API aceita path ou BinaryIO
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+            tmp.write(audio_bytes)
+            tmp_path = tmp.name
+
+        uploaded = client.files.upload(
+            file=tmp_path,
+            config=types.UploadFileConfig(mime_type=mime_type, display_name="audio"),
         )
-        return (response.text or "").strip()
+        try:
+            response = client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=[
+                    types.Content(
+                        role="user",
+                        parts=[
+                            types.Part(
+                                file_data=types.FileData(
+                                    file_uri=uploaded.uri,
+                                    mime_type=mime_type,
+                                )
+                            ),
+                            types.Part(
+                                text=(
+                                    "Transcreva o áudio para texto em português do Brasil. "
+                                    "Retorne apenas o texto transcrito, sem aspas, sem comentários, "
+                                    "sem formatação. Se não houver fala audível, retorne vazio."
+                                )
+                            ),
+                        ],
+                    )
+                ],
+                config=types.GenerateContentConfig(
+                    temperature=0.0,
+                    max_output_tokens=1024,
+                    thinking_config=types.ThinkingConfig(thinking_budget=0),
+                ),
+            )
+        finally:
+            try:
+                client.files.delete(name=uploaded.name)
+            except Exception:
+                pass
+
+        text = (response.text or "").strip()
+        if not text:
+            finish = getattr(response.candidates[0], "finish_reason", None) if response.candidates else None
+            logger.warning("Gemini retornou texto vazio para áudio. finish_reason=%s", finish)
+        return text
     except Exception:
         logger.exception("Erro ao transcrever áudio via Gemini")
         return ""
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
 
 def classificar_brain_dump(

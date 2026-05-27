@@ -240,12 +240,21 @@ def test_transcrever_audio_sem_api_key_retorna_vazio(monkeypatch):
     assert resultado == ""
 
 
-def test_transcrever_audio_retorna_texto_transcrito(monkeypatch):
-    monkeypatch.setattr("src.services.ai_service.GEMINI_API_KEY", "fake-key")
+def _make_audio_mock_client(text: str = "texto") -> MagicMock:
+    """Mock de genai.Client pronto para o caminho Files API."""
     mock_response = MagicMock()
-    mock_response.text = "  comprar café e ligar pro dentista  "
+    mock_response.text = text
+    mock_response.candidates = []
     mock_client = MagicMock()
     mock_client.models.generate_content.return_value = mock_response
+    mock_client.files.upload.return_value.uri = "https://files.example/audio-id"
+    mock_client.files.upload.return_value.name = "files/audio-id"
+    return mock_client
+
+
+def test_transcrever_audio_retorna_texto_transcrito(monkeypatch):
+    monkeypatch.setattr("src.services.ai_service.GEMINI_API_KEY", "fake-key")
+    mock_client = _make_audio_mock_client("  comprar café e ligar pro dentista  ")
     with patch("src.services.ai_service.genai.Client", return_value=mock_client):
         resultado = transcrever_audio(b"audio_bytes", "audio/ogg")
     assert resultado == "comprar café e ligar pro dentista"
@@ -253,10 +262,14 @@ def test_transcrever_audio_retorna_texto_transcrito(monkeypatch):
 
 def test_transcrever_audio_retorna_vazio_se_response_none(monkeypatch):
     monkeypatch.setattr("src.services.ai_service.GEMINI_API_KEY", "fake-key")
+    mock_client = _make_audio_mock_client.__wrapped__ if hasattr(_make_audio_mock_client, "__wrapped__") else None
     mock_response = MagicMock()
     mock_response.text = None
+    mock_response.candidates = []
     mock_client = MagicMock()
     mock_client.models.generate_content.return_value = mock_response
+    mock_client.files.upload.return_value.uri = "https://files.example/audio-id"
+    mock_client.files.upload.return_value.name = "files/audio-id"
     with patch("src.services.ai_service.genai.Client", return_value=mock_client):
         resultado = transcrever_audio(b"audio_bytes")
     assert resultado == ""
@@ -271,13 +284,10 @@ def test_transcrever_audio_retorna_vazio_em_excecao(monkeypatch):
 
 def test_transcrever_audio_passa_mime_type_correto(monkeypatch):
     monkeypatch.setattr("src.services.ai_service.GEMINI_API_KEY", "fake-key")
-    mock_response = MagicMock()
-    mock_response.text = "texto"
-    mock_client = MagicMock()
-    mock_client.models.generate_content.return_value = mock_response
+    mock_client = _make_audio_mock_client("texto")
     with patch("src.services.ai_service.genai.Client", return_value=mock_client):
         transcrever_audio(b"bytes", "audio/mpeg")
     call_kwargs = mock_client.models.generate_content.call_args
     contents = call_kwargs.kwargs.get("contents") or call_kwargs.args[1]
-    blob = contents[0].parts[0].inline_data
-    assert blob.mime_type == "audio/mpeg"
+    file_data = contents[0].parts[0].file_data
+    assert file_data.mime_type == "audio/mpeg"
