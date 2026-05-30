@@ -32,9 +32,14 @@ class User(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="America/Fortaleza")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Google Calendar (C6) — preenchidos só após o usuário autorizar via OAuth.
+    google_refresh_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    google_calendar_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     lists: Mapped[List[TaskList]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    tasks: Mapped[List[Task]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    tasks: Mapped[List[Task]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", foreign_keys="Task.user_id"
+    )
     config: Mapped[Optional[Config]] = relationship(back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 
@@ -46,6 +51,9 @@ class TaskList(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     slug: Mapped[str] = mapped_column(String(128), nullable=False)
     is_couple: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    couple_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("couples.id"), nullable=True
+    )
     archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
@@ -59,6 +67,20 @@ class Task(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     list_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid(as_uuid=True), ForeignKey("lists.id"), nullable=True)
+    # Tarefa do casal: couple_id não-nulo = visível/editável pelos dois membros.
+    couple_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("couples.id"), nullable=True
+    )
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    # Tarefa de casal "conjunta": precisa dos dois (rótulo). Conclusão segue única.
+    # Estados: assigned_to setado = individual; nulo + couple_joint falso = sem dono;
+    # couple_joint verdadeiro = conjunta.
+    couple_joint: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     quadrant: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
@@ -76,12 +98,15 @@ class Task(Base):
     )
     waiting_since: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     due_alerted: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
+    # Google Calendar (C6) — id do evento espelhado e quando foi sincronizado.
+    gcal_event_id: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    gcal_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     last_touched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
-    user: Mapped[User] = relationship(back_populates="tasks")
+    user: Mapped[User] = relationship(back_populates="tasks", foreign_keys=[user_id])
     task_list: Mapped[Optional[TaskList]] = relationship(back_populates="tasks", foreign_keys=[list_id])
     reminders: Mapped[List[Reminder]] = relationship(back_populates="task", cascade="all, delete-orphan")
 
@@ -95,6 +120,48 @@ class Reminder(Base):
     sent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     task: Mapped[Task] = relationship(back_populates="reminders")
+
+
+class Couple(Base):
+    __tablename__ = "couples"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Reservado para a sincronização futura com Google Calendar (calendário do casal).
+    gcal_calendar_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    members: Mapped[List[CoupleMember]] = relationship(
+        back_populates="couple", cascade="all, delete-orphan"
+    )
+
+
+class CoupleMember(Base):
+    __tablename__ = "couple_members"
+
+    couple_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("couples.id"), primary_key=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), primary_key=True
+    )
+    role: Mapped[str] = mapped_column(String(16), nullable=False, default="member")
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    couple: Mapped[Couple] = relationship(back_populates="members")
+    user: Mapped[User] = relationship()
+
+
+class Invite(Base):
+    __tablename__ = "invites"
+
+    code: Mapped[str] = mapped_column(String(16), primary_key=True)
+    couple_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("couples.id"), nullable=False)
+    created_by: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
 
 
 class Config(Base):

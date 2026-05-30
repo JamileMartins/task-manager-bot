@@ -9,9 +9,9 @@ import pytz
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from src.config import AUTHORIZED_CHAT_ID
 from src.services.task_service import (
     archive_task,
+    get_all_user_chat_ids,
     get_config,
     get_conquistas,
     get_daily_summary_tasks,
@@ -75,9 +75,10 @@ def _rev_clear(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
 # ---------------------------------------------------------------------------
 
 async def send_reminders(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Job a cada minuto: dispara lembretes vencidos (US-17) e desbloqueia tarefas aguardando por data (US-28)."""
-    if is_paused(AUTHORIZED_CHAT_ID):
-        return
+    """Job a cada minuto: dispara lembretes vencidos (US-17) e desbloqueia tarefas aguardando por data (US-28).
+
+    A pausa é verificada por dono (chat_id de cada item), não global — multiusuário.
+    """
     try:
         due = get_due_reminders()
     except Exception:
@@ -85,6 +86,8 @@ async def send_reminders(context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     for reminder, task, chat_id in due:
+        if is_paused(chat_id):
+            continue
         try:
             await context.bot.send_message(
                 chat_id,
@@ -103,6 +106,8 @@ async def send_reminders(context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     for task, chat_id in waiting:
+        if is_paused(chat_id):
+            continue
         try:
             unblock_task(task.id)
             await context.bot.send_message(
@@ -120,6 +125,8 @@ async def send_reminders(context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     for task, chat_id in overdue:
+        if is_paused(chat_id):
+            continue
         try:
             mark_due_alerted(task.id)
             await context.bot.send_message(
@@ -456,21 +463,31 @@ async def rollover_medications_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 # Job setup
 # ---------------------------------------------------------------------------
 
-def setup_jobs(app, chat_id: int) -> None:
-    cfg = get_config(chat_id)
-    if cfg is None:
-        return
-    _schedule_daily(app, chat_id, cfg)
-    _schedule_weekly(app, chat_id, cfg)
+def setup_jobs(app) -> None:
+    """Agenda os jobs para todos os usuários registrados (multiusuário).
+
+    send_reminders é um job único que varre todos os usuários; resumo diário,
+    revisão semanal e rollover de medicações são agendados por chat_id.
+    """
+    # Lembretes: um job global (filtra pausa por dono internamente).
     app.job_queue.run_repeating(send_reminders, interval=60, first=10, name="reminders")
+
+    chat_ids = get_all_user_chat_ids()
     tz = pytz.timezone("America/Fortaleza")
-    app.job_queue.run_daily(
-        rollover_medications_job,
-        time=time(0, 1, 0, tzinfo=tz),
-        name="rollover_meds",
-        data={"chat_id": chat_id},
-    )
-    logger.info("Rollover de medicações agendado às 00:01 para chat_id=%s", chat_id)
+    for chat_id in chat_ids:
+        cfg = get_config(chat_id)
+        if cfg is None:
+            continue
+        _schedule_daily(app, chat_id, cfg)
+        _schedule_weekly(app, chat_id, cfg)
+        app.job_queue.run_daily(
+            rollover_medications_job,
+            time=time(0, 1, 0, tzinfo=tz),
+            name=f"rollover_meds_{chat_id}",
+            data={"chat_id": chat_id},
+        )
+        logger.info("Rollover de medicações agendado às 00:01 para chat_id=%s", chat_id)
+    logger.info("Jobs agendados para %d usuário(s).", len(chat_ids))
 
 
 def _schedule_daily(app, chat_id: int, cfg) -> None:

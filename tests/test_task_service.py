@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 from sqlalchemy import select
 
-from src.db.models import Config, Reminder, Task, TaskList, User
+from src.db.models import Config, Couple, CoupleMember, Reminder, Task, TaskList, User
 from src.services import task_service
 
 
@@ -1544,69 +1544,66 @@ def test_mark_reminder_sent_marca_enviado(svc):
 
 
 # ---------------------------------------------------------------------------
-# F5 — get_couple_tasks (US-19)
+# C3 — get_couple_tasks (tarefas compartilhadas por couple_id)
 # ---------------------------------------------------------------------------
 
-def test_get_couple_tasks_retorna_tarefas_da_lista_casal(svc):
-    user = _user(svc)
-    task_service._create_initial_lists(svc, user)
-    svc.flush()
-    casal = svc.scalar(
-        select(TaskList).where(TaskList.user_id == user.id, TaskList.is_couple.is_(True))
+def _couple(session, *users) -> Couple:
+    """Cria um casal e vincula os usuários informados como membros."""
+    now = datetime.now(timezone.utc)
+    couple = Couple(created_at=now)
+    session.add(couple)
+    session.flush()
+    for u in users:
+        session.add(CoupleMember(couple_id=couple.id, user_id=u.id, role="member", joined_at=now))
+    session.flush()
+    return couple
+
+
+def _couple_task(session, user, couple, *, title="Tarefa casal", status="aberta") -> Task:
+    now = datetime.now(timezone.utc)
+    t = Task(
+        user_id=user.id, couple_id=couple.id, created_by=user.id, list_id=None,
+        title=title, status=status, sort_order=0, created_at=now, last_touched_at=now,
     )
-    _task(svc, user, title="Comprar pão", list_id=casal.id)
-    _task(svc, user, title="Pagar aluguel", list_id=casal.id)
-    _task(svc, user, title="Na inbox")
-
-    tasks, group_id = task_service.get_couple_tasks(user.telegram_chat_id)
-
-    assert len(tasks) == 2
-    assert all(t.list_id == casal.id for t in tasks)
-    assert group_id is None
+    session.add(t)
+    session.flush()
+    return t
 
 
-def test_get_couple_tasks_retorna_group_id_configurado(svc):
-    user = _user(svc)
-    task_service._create_initial_lists(svc, user)
-    svc.flush()
-    task_service.update_config(user.telegram_chat_id, couple_group_chat_id=-100999)
+def test_get_couple_tasks_retorna_tarefas_do_casal(svc):
+    a = _user(svc, chat_id=111, name="Ana")
+    b = _user(svc, chat_id=222, name="Beto")
+    couple = _couple(svc, a, b)
+    _couple_task(svc, a, couple, title="Comprar pão")
+    _couple_task(svc, b, couple, title="Pagar aluguel")
+    _task(svc, a, title="Pessoal de Ana")  # não deve aparecer
 
-    _, group_id = task_service.get_couple_tasks(user.telegram_chat_id)
+    # Os dois membros enxergam as mesmas tarefas do casal.
+    tasks_a = task_service.get_couple_tasks(111)
+    tasks_b = task_service.get_couple_tasks(222)
 
-    assert group_id == -100999
+    assert {t.title for t in tasks_a} == {"Comprar pão", "Pagar aluguel"}
+    assert {t.title for t in tasks_b} == {"Comprar pão", "Pagar aluguel"}
 
 
 def test_get_couple_tasks_ignora_concluidas(svc):
-    user = _user(svc)
-    task_service._create_initial_lists(svc, user)
-    svc.flush()
-    casal = svc.scalar(
-        select(TaskList).where(TaskList.user_id == user.id, TaskList.is_couple.is_(True))
-    )
-    _task(svc, user, title="Aberta", list_id=casal.id)
-    _task(svc, user, title="Concluída", list_id=casal.id, status="concluida")
+    a = _user(svc, chat_id=111, name="Ana")
+    couple = _couple(svc, a)
+    _couple_task(svc, a, couple, title="Aberta")
+    _couple_task(svc, a, couple, title="Concluída", status="concluida")
 
-    tasks, _ = task_service.get_couple_tasks(user.telegram_chat_id)
+    tasks = task_service.get_couple_tasks(111)
 
-    assert len(tasks) == 1
-    assert tasks[0].title == "Aberta"
+    assert [t.title for t in tasks] == ["Aberta"]
 
 
-def test_get_couple_tasks_lista_vazia_retorna_lista_vazia(svc):
-    user = _user(svc)
-    task_service._create_initial_lists(svc, user)
-    svc.flush()
-
-    tasks, _ = task_service.get_couple_tasks(user.telegram_chat_id)
-
-    assert tasks == []
+def test_get_couple_tasks_sem_casal_retorna_vazio(svc):
+    _user(svc, chat_id=111, name="Ana")
+    assert task_service.get_couple_tasks(111) == []
 
 
 def test_get_couple_tasks_usuario_inexistente(svc):
-    tasks, group_id = task_service.get_couple_tasks(999888)
-
-    assert tasks == []
-    assert group_id is None
+    assert task_service.get_couple_tasks(999888) == []
 
 
 # ---------------------------------------------------------------------------

@@ -11,8 +11,8 @@ from telegram import Update
 from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
-from src.config import AUTHORIZED_CHAT_ID, DEFAULT_TIMEZONE
-from src.services import task_service
+from src.config import ALLOWED_CHAT_IDS, AUTHORIZED_CHAT_ID, DEFAULT_TIMEZONE
+from src.services import couple_service, task_service
 from src.utils import keyboards, textos
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def is_authorized(update: Update) -> bool:
-    return update.effective_chat is not None and update.effective_chat.id == AUTHORIZED_CHAT_ID
+    return update.effective_chat is not None and update.effective_chat.id in ALLOWED_CHAT_IDS
 
 
 async def deny_unauthorized(update: Update) -> None:
@@ -234,16 +234,15 @@ async def cmd_casal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         await msg.reply_chat_action(ChatAction.TYPING)
         chat_id = update.effective_chat.id
-        tasks, group_id = await asyncio.to_thread(task_service.get_couple_tasks, chat_id)
+        if not await asyncio.to_thread(task_service.has_couple, chat_id):
+            await msg.reply_text(textos.MSG_CASAL_SEM_PAR)
+            return
+        tasks = await asyncio.to_thread(task_service.get_couple_tasks, chat_id)
         if not tasks:
             await msg.reply_text(textos.MSG_CASAL_VAZIA)
             return
-        texto = textos.msg_casal(tasks)
-        if group_id:
-            await context.bot.send_message(group_id, texto)
-            await msg.reply_text(textos.MSG_CASAL_ENVIADO)
-        else:
-            await msg.reply_text(texto + "\n\n" + textos.MSG_CASAL_SEM_GRUPO)
+        names = await asyncio.to_thread(couple_service.member_names, chat_id)
+        await msg.reply_text(textos.msg_casal(tasks, names), reply_markup=keyboards.kb_tasks(tasks))
     except Exception:
         logger.exception("Erro em /casal")
         await msg.reply_text(textos.MSG_ERRO_GENERICO)
@@ -419,7 +418,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     chat_id = update.effective_chat.id if update.effective_chat else None
-    if chat_id != AUTHORIZED_CHAT_ID:
+    if chat_id not in ALLOWED_CHAT_IDS:
         return
 
     aviso = f"⚠️ Erro interno: {error_name}\nVerifique os logs para detalhes."

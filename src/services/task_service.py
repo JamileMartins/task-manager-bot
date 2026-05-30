@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from src.db.models import Config, Reminder, Task, TaskList, User
+from src.db.models import Config, CoupleMember, Reminder, Task, TaskList, User
 from src.db.session import get_session
 
 
@@ -31,6 +31,25 @@ def _slugify(text: str) -> str:
     text = re.sub(r"[^\w\s-]", "", text)
     text = re.sub(r"[\s_]+", "-", text)
     return text.strip("-")
+
+
+def _couple_id_for(session: Session, user_id) -> Optional[uuid.UUID]:
+    """Retorna o couple_id do usuário, ou None se não estiver pareado."""
+    return session.scalar(
+        select(CoupleMember.couple_id).where(CoupleMember.user_id == user_id)
+    )
+
+
+def _visible_filter(user_id, couple_id):
+    """Filtro de visibilidade de tarefas: pessoais do usuário + tarefas do casal.
+
+    IMPORTANTE (privacidade): quando couple_id é None (usuário sem casal),
+    restringe ao próprio user_id. Nunca comparar couple_id com None aqui —
+    no SQLAlchemy `== None` vira `IS NULL` e vazaria tarefas pessoais alheias.
+    """
+    if couple_id is None:
+        return Task.user_id == user_id
+    return or_(Task.user_id == user_id, Task.couple_id == couple_id)
 
 
 _INITIAL_LISTS = [
@@ -64,6 +83,12 @@ def _create_initial_lists(session: Session, user: User) -> None:
         stale_waiting_days=14,
     )
     session.add(cfg)
+
+
+def get_all_user_chat_ids() -> list[int]:
+    """Retorna o telegram_chat_id de todos os usuários registrados (para agendar jobs)."""
+    with get_session() as session:
+        return list(session.scalars(select(User.telegram_chat_id)).all())
 
 
 def get_or_create_user(chat_id: int, name: str = "usuária") -> User:
@@ -312,6 +337,7 @@ def get_inbox_count(chat_id: int) -> int:
             select(func.count(Task.id)).where(
                 Task.user_id == user.id,
                 Task.list_id.is_(None),
+                Task.couple_id.is_(None),
                 Task.status == "aberta",
             )
         ) or 0
@@ -357,34 +383,106 @@ def get_inbox_tasks(chat_id: int) -> list[Task]:
             return []
         return session.scalars(
             select(Task)
-            .where(Task.user_id == user.id, Task.list_id.is_(None), Task.status == "aberta")
+            .where(
+                Task.user_id == user.id,
+                Task.list_id.is_(None),
+                Task.couple_id.is_(None),
+                Task.status == "aberta",
+            )
             .order_by(Task.created_at)
         ).all()
 
 
-def get_couple_tasks(chat_id: int) -> tuple[list[Task], int | None]:
-    """Retorna (tarefas abertas da lista de casal, group_chat_id configurado)."""
+def get_couple_tasks(chat_id: int) -> list[Task]:
+    """Retorna as tarefas abertas/aguardando do casal do usuário (compartilhadas)."""
     with get_session() as session:
         user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
         if user is None:
-            return [], None
-        couple_list = session.scalar(
-            select(TaskList).where(
-                TaskList.user_id == user.id,
-                TaskList.is_couple.is_(True),
-                TaskList.archived.is_(False),
+            return []
+        couple_id = _couple_id_for(session, user.id)
+        if couple_id is None:
+            return []
+        return list(session.scalars(
+            select(Task)
+            .options(selectinload(Task.task_list))
+            .where(
+                Task.couple_id == couple_id,
+                Task.status.in_(["aberta", "aguardando"]),
             )
-        )
-        tasks: list[Task] = []
-        if couple_list:
-            tasks = list(session.scalars(
-                select(Task)
-                .where(Task.list_id == couple_list.id, Task.status == "aberta")
-                .order_by(Task.quadrant.nullslast(), Task.sort_order)
-            ).all())
-        cfg = session.scalar(select(Config).where(Config.user_id == user.id))
-        group_id = cfg.couple_group_chat_id if cfg else None
-        return tasks, group_id
+            .order_by(Task.quadrant.nullslast(), Task.sort_order)
+        ).all())
+
+
+def has_couple(chat_id: int) -> bool:
+    """True se o usuário está pareado num casal."""
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return False
+        return _couple_id_for(session, user.id) is not None
+
+
+def set_task_couple(task_id: str | uuid.UUID, chat_id: int, make_couple: bool) -> Optional[Task]:
+    """Converte uma tarefa entre pessoal e do casal.
+
+    make_couple=True  → vincula ao casal do usuário (sai da lista pessoal).
+    make_couple=False → volta a ser pessoal (couple_id=None).
+    """
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        task = session.get(Task, uid)
+        if user is None or task is None:
+            return None
+        if make_couple:
+            couple_id = _couple_id_for(session, user.id)
+            if couple_id is None:
+                return None
+            task.couple_id = couple_id
+            task.list_id = None
+            if task.created_by is None:
+                task.created_by = user.id
+        else:
+            task.couple_id = None
+        task.last_touched_at = _now()
+        return task
+
+
+def assign_couple_task(task_id: str | uuid.UUID, chat_id: int, target: str) -> Optional[Task]:
+    """Define o modo/dono de uma tarefa de casal.
+
+    target:
+      "me"      → individual, de quem chamou;
+      "partner" → individual, do outro membro;
+      "joint"   → conjunta (precisa dos dois);
+      "shared"/"none" → sem dono (qualquer um faz).
+    Retorna a Task atualizada, ou None se não for tarefa de casal / inválida.
+    """
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        task = session.get(Task, uid)
+        if user is None or task is None or task.couple_id is None:
+            return None
+        if target == "me":
+            task.assigned_to = user.id
+            task.couple_joint = False
+        elif target == "partner":
+            task.assigned_to = session.scalar(
+                select(CoupleMember.user_id).where(
+                    CoupleMember.couple_id == task.couple_id,
+                    CoupleMember.user_id != user.id,
+                )
+            )
+            task.couple_joint = False
+        elif target == "joint":
+            task.assigned_to = None
+            task.couple_joint = True
+        else:  # "shared"/"none"
+            task.assigned_to = None
+            task.couple_joint = False
+        task.last_touched_at = _now()
+        return task
 
 
 def search_tasks(chat_id: int, term: str) -> list[Task]:
@@ -393,12 +491,13 @@ def search_tasks(chat_id: int, term: str) -> list[Task]:
         user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
         if user is None:
             return []
+        couple_id = _couple_id_for(session, user.id)
         pattern = f"%{term}%"
         return list(session.scalars(
             select(Task)
             .options(selectinload(Task.task_list))
             .where(
-                Task.user_id == user.id,
+                _visible_filter(user.id, couple_id),
                 Task.status.not_in(["concluida", "arquivada"]),
                 or_(Task.title.ilike(pattern), Task.notes.ilike(pattern)),
             )
@@ -588,11 +687,25 @@ def get_all_open_tasks(chat_id: int) -> list[TaskGroup]:
             .where(
                 Task.user_id == user.id,
                 Task.list_id.is_(None),
+                Task.couple_id.is_(None),
                 Task.status.in_(["aberta", "aguardando"]),
                 not_future_recurrence,
             )
             .order_by(Task.sort_order, Task.created_at)
         ).all())
+
+        couple_id = _couple_id_for(session, user.id)
+        couple_tasks: list[Task] = []
+        if couple_id is not None:
+            couple_tasks = list(session.scalars(
+                select(Task)
+                .where(
+                    Task.couple_id == couple_id,
+                    Task.status.in_(["aberta", "aguardando"]),
+                    not_future_recurrence,
+                )
+                .order_by(Task.quadrant.nullslast(), Task.sort_order)
+            ).all())
 
         lists = list(session.scalars(
             select(TaskList)
@@ -603,6 +716,8 @@ def get_all_open_tasks(chat_id: int) -> list[TaskGroup]:
         groups: list[TaskGroup] = []
         if inbox_tasks:
             groups.append(TaskGroup(name="Inbox", slug=None, list_id=None, tasks=inbox_tasks))
+        if couple_tasks:
+            groups.append(TaskGroup(name="Casa (casal)", slug="casal", list_id=None, tasks=couple_tasks))
 
         for lst in lists:
             tasks = list(session.scalars(
@@ -695,12 +810,15 @@ def save_classified_tasks(
             ).all()
         }
 
+        couple_id = _couple_id_for(session, user.id)
         now = _now()
         saved: list[Task] = []
 
         for t in tarefas:
+            # Destino casal: tarefa compartilhada (sem lista pessoal).
+            to_couple = bool(t.get("casal")) and couple_id is not None
             list_name = t.get("lista_sugerida")
-            list_id = lista_map.get(list_name) if list_name else None
+            list_id = None if to_couple else (lista_map.get(list_name) if list_name else None)
 
             is_external = bool(t.get("impedimento_externo"))
             status = "aguardando" if is_external else "aberta"
@@ -715,6 +833,8 @@ def save_classified_tasks(
             task = Task(
                 user_id=user.id,
                 list_id=list_id,
+                couple_id=couple_id if to_couple else None,
+                created_by=user.id if to_couple else None,
                 title=(t.get("titulo") or "")[:500],
                 status=status,
                 quadrant=t.get("quadrante_sugerido"),
@@ -769,11 +889,12 @@ def get_task_for_agora(
         if user is None:
             return None
 
+        couple_id = _couple_id_for(session, user.id)
         candidates = session.scalars(
             select(Task)
             .options(selectinload(Task.task_list))
             .where(
-                Task.user_id == user.id,
+                _visible_filter(user.id, couple_id),
                 Task.status == "aberta",
                 or_(Task.estimate_min <= tempo_min, Task.estimate_min.is_(None)),
             )
@@ -1051,11 +1172,13 @@ def get_daily_summary_tasks(chat_id: int) -> tuple[list[Task], list[Task]]:
         day_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = now_local.replace(hour=23, minute=59, second=59, microsecond=999999)
 
+        couple_id = _couple_id_for(session, user.id)
+
         today_tasks = list(session.scalars(
             select(Task)
             .options(selectinload(Task.task_list))
             .where(
-                Task.user_id == user.id,
+                _visible_filter(user.id, couple_id),
                 Task.status == "aberta",
                 Task.due_at >= day_start,
                 Task.due_at <= day_end,
@@ -1069,7 +1192,7 @@ def get_daily_summary_tasks(chat_id: int) -> tuple[list[Task], list[Task]]:
             select(Task)
             .options(selectinload(Task.task_list))
             .where(
-                Task.user_id == user.id,
+                _visible_filter(user.id, couple_id),
                 Task.status == "aberta",
                 Task.quadrant.in_([1, 2]),
             )
@@ -1098,11 +1221,12 @@ def get_tomorrow_tasks(chat_id: int) -> list[Task]:
         day_end = tomorrow.replace(hour=23, minute=59, second=59, microsecond=999999)
         today_end = now_local.replace(hour=23, minute=59, second=59, microsecond=999999)
 
+        couple_id = _couple_id_for(session, user.id)
         tasks = list(session.scalars(
             select(Task)
             .options(selectinload(Task.task_list))
             .where(
-                Task.user_id == user.id,
+                _visible_filter(user.id, couple_id),
                 Task.status == "aberta",
                 or_(
                     # Tarefas com due_at explícito amanhã
@@ -1346,11 +1470,12 @@ def get_upcoming_tasks(chat_id: int, days: int) -> list[Task]:
         range_end = (now_local + timedelta(days=days)).replace(
             hour=23, minute=59, second=59, microsecond=999999
         )
+        couple_id = _couple_id_for(session, user.id)
         return list(session.scalars(
             select(Task)
             .options(selectinload(Task.task_list))
             .where(
-                Task.user_id == user.id,
+                _visible_filter(user.id, couple_id),
                 Task.status == "aberta",
                 Task.due_at >= range_start,
                 Task.due_at <= range_end,

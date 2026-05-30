@@ -10,6 +10,7 @@ from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
 from src.handlers.common import deny_unauthorized, is_authorized
+from src.handlers import notify
 from src.services import ai_service, task_service
 from src.utils import keyboards, textos
 
@@ -31,16 +32,29 @@ def _set_pending(
     context: ContextTypes.DEFAULT_TYPE,
     tasks: list[dict],
     listas: list[dict],
+    has_couple: bool = False,
 ) -> None:
     context.user_data[_PENDING_KEY] = {
         "tasks": tasks,
         "listas": listas,
         "adj_index": 0,
+        "has_couple": has_couple,
     }
 
 
 def _clear_pending(context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.pop(_PENDING_KEY, None)
+
+
+async def _notify_couple_created(update: Update, context: ContextTypes.DEFAULT_TYPE, saved: list) -> None:
+    """Avisa o parceiro quando tarefas de casal foram criadas na captura."""
+    n = sum(1 for t in saved if getattr(t, "couple_id", None) is not None)
+    if n == 0:
+        return
+    actor = (update.effective_user.full_name if update.effective_user else None) or "Seu par"
+    await notify.notify_partner(
+        update.effective_chat.id, context.bot, textos.msg_casal_compartilhou(actor, n)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -73,7 +87,8 @@ async def process_text_capture(
             ai_service.classificar_brain_dump, text, nomes_listas
         )
 
-        _set_pending(context, tarefas, listas_dicts)
+        has_couple = await asyncio.to_thread(task_service.has_couple, chat_id)
+        _set_pending(context, tarefas, listas_dicts, has_couple)
         await msg.reply_text(
             textos.msg_classificacao_resumo(tarefas),
             reply_markup=keyboards.kb_classificacao_resumo(),
@@ -128,6 +143,7 @@ async def cb_approve_capture(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         _clear_pending(context)
         await query.edit_message_text(textos.msg_captura_salva(len(saved)))
+        await _notify_couple_created(update, context, saved)
     except Exception:
         logger.exception("Erro ao salvar tarefas classificadas")
         await query.edit_message_text(textos.MSG_ERRO_GENERICO)
@@ -187,10 +203,15 @@ async def cb_adj_task(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     listas = pending["listas"]
 
     if 0 <= task_idx < len(tasks):
-        if list_idx == -1:
+        if list_idx == -1:  # Inbox
             tasks[task_idx]["lista_sugerida"] = None
+            tasks[task_idx]["casal"] = False
+        elif list_idx == -2:  # Casal
+            tasks[task_idx]["lista_sugerida"] = None
+            tasks[task_idx]["casal"] = True
         elif 0 <= list_idx < len(listas):
             tasks[task_idx]["lista_sugerida"] = listas[list_idx]["name"]
+            tasks[task_idx]["casal"] = False
 
     next_idx = task_idx + 1
     pending["adj_index"] = next_idx
@@ -210,6 +231,7 @@ async def cb_adj_task(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             )
             _clear_pending(context)
             await query.edit_message_text(textos.msg_captura_salva(len(saved)))
+            await _notify_couple_created(update, context, saved)
         except Exception:
             logger.exception("Erro ao salvar tarefas após ajuste")
             await query.edit_message_text(textos.MSG_ERRO_GENERICO)
@@ -221,7 +243,7 @@ async def _show_task_for_adjustment(query, pending: dict) -> None:
     listas = pending["listas"]
     task = tasks[idx]
     texto = textos.msg_ajustar_tarefa(task, idx, len(tasks))
-    kb = keyboards.kb_ajustar_tarefa(idx, listas)
+    kb = keyboards.kb_ajustar_tarefa(idx, listas, show_couple=pending.get("has_couple", False))
     await query.edit_message_text(texto, reply_markup=kb)
 
 

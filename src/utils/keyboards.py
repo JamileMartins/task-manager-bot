@@ -92,6 +92,7 @@ def kb_classificacao_resumo() -> InlineKeyboardMarkup:
 def kb_ajustar_tarefa(
     task_idx: int,
     listas: list[dict],
+    show_couple: bool = False,
 ) -> InlineKeyboardMarkup:
     """Teclado de seleção de lista para uma tarefa durante o ajuste item a item."""
     from src.utils.textos import lista_emoji
@@ -108,7 +109,10 @@ def kb_ajustar_tarefa(
             row = []
     if row:
         rows.append(row)
-    rows.append([InlineKeyboardButton("📥 Inbox", callback_data=f"adj:{task_idx}:-1")])
+    bottom = [InlineKeyboardButton("📥 Inbox", callback_data=f"adj:{task_idx}:-1")]
+    if show_couple:
+        bottom.append(InlineKeyboardButton("💞 Casal", callback_data=f"adj:{task_idx}:-2"))
+    rows.append(bottom)
     return InlineKeyboardMarkup(rows)
 
 
@@ -181,7 +185,7 @@ def kb_inbox(tasks: Sequence[Task]) -> InlineKeyboardMarkup:
 # Detalhe de tarefa (F3)
 # ---------------------------------------------------------------------------
 
-def kb_task_detail(task: Task, listas: list[dict], subtasks=None) -> InlineKeyboardMarkup:
+def kb_task_detail(task: Task, listas: list[dict], subtasks=None, show_couple: bool = False) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
 
     if task.status == "aguardando":
@@ -237,6 +241,24 @@ def kb_task_detail(task: Task, listas: list[dict], subtasks=None) -> InlineKeybo
             InlineKeyboardButton(nota_label, callback_data=f"task_note:{task.id}"),
             InlineKeyboardButton("✏️ Título", callback_data=f"task_title:{task.id}"),
         ])
+
+        # Modo da tarefa de casal: individual (minha/do par), sem dono ou conjunta.
+        if task.couple_id:
+            joint = bool(getattr(task, "couple_joint", False))
+            individual = task.assigned_to is not None
+            shared_mark = " ✓" if (not joint and not individual) else ""
+            joint_mark = " ✓" if joint else ""
+            rows.append([
+                InlineKeyboardButton("🙋 Minha vez", callback_data=f"task_assign:{task.id}:me"),
+                InlineKeyboardButton("🤝 Vez do par", callback_data=f"task_assign:{task.id}:partner"),
+            ])
+            rows.append([
+                InlineKeyboardButton("🆓 Sem dono" + shared_mark, callback_data=f"task_assign:{task.id}:shared"),
+                InlineKeyboardButton("💞 Conjunta" + joint_mark, callback_data=f"task_assign:{task.id}:joint"),
+            ])
+            rows.append([InlineKeyboardButton("👤 Tornar pessoal", callback_data=f"task_couple:{task.id}:0")])
+        elif show_couple:
+            rows.append([InlineKeyboardButton("💞 Tornar do casal", callback_data=f"task_couple:{task.id}:1")])
 
     if task.list_id:
         rows.append([InlineKeyboardButton("← Voltar", callback_data=f"view_list:{task.list_id}")])

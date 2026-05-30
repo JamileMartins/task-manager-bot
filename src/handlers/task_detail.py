@@ -12,6 +12,7 @@ from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes, Con
 
 from src.config import DEFAULT_TIMEZONE
 from src.handlers.common import deny_unauthorized, is_authorized
+from src.handlers import notify
 from src.services import task_service
 from src.utils import keyboards, textos
 
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 _MOVE_TASK_KEY = "move_task_id"
 _MOVE_LISTAS_KEY = "move_listas"
+_HAS_COUPLE_KEY = "detail_has_couple"
 _NOTE_TASK_KEY = "note_task_id"
 _TITLE_TASK_KEY = "title_task_id"
 
@@ -41,7 +43,7 @@ async def _refresh_detail(query, task_id: uuid.UUID, context: ContextTypes.DEFAU
         return
     await query.edit_message_text(
         textos.msg_task_detail(task, subtasks),
-        reply_markup=keyboards.kb_task_detail(task, listas, subtasks),
+        reply_markup=keyboards.kb_task_detail(task, listas, subtasks, show_couple=context.user_data.get(_HAS_COUPLE_KEY, False)),
     )
 
 
@@ -65,6 +67,8 @@ async def cb_task_detail(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     ]
     context.user_data[_MOVE_LISTAS_KEY] = listas_dicts
     context.user_data[_MOVE_TASK_KEY] = str(task_id)
+    has_couple = await asyncio.to_thread(task_service.has_couple, update.effective_chat.id)
+    context.user_data[_HAS_COUPLE_KEY] = has_couple
 
     try:
         task, subtasks = await asyncio.gather(
@@ -76,11 +80,72 @@ async def cb_task_detail(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             return
         await query.edit_message_text(
             textos.msg_task_detail(task, subtasks),
-            reply_markup=keyboards.kb_task_detail(task, listas_dicts, subtasks),
+            reply_markup=keyboards.kb_task_detail(task, listas_dicts, subtasks, show_couple=has_couple),
         )
     except Exception:
         logger.exception("Erro ao abrir detalhe da tarefa %s", task_id)
         await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+
+
+# ---------------------------------------------------------------------------
+# Alternar pessoal <-> casal (C3)
+# ---------------------------------------------------------------------------
+
+async def cb_task_set_couple(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    if not is_authorized(update):
+        await query.answer()
+        return
+    parts = query.data.split(":")
+    task_id = uuid.UUID(parts[1])
+    make_couple = parts[2] == "1"
+
+    updated = await asyncio.to_thread(
+        task_service.set_task_couple, task_id, update.effective_chat.id, make_couple
+    )
+    if updated is None:
+        await query.answer("Você ainda não está num casal 💞 Use /casal_convidar.", show_alert=True)
+        return
+    await query.answer("💞 Agora é do casal!" if make_couple else "👤 Agora é pessoal.")
+    if make_couple:
+        actor = (update.effective_user.full_name if update.effective_user else None) or "Seu par"
+        await notify.notify_partner(
+            update.effective_chat.id, context.bot, textos.msg_casal_compartilhou(actor, 1)
+        )
+    await _refresh_detail(query, task_id, context)
+
+
+async def cb_task_assign(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    if not is_authorized(update):
+        await query.answer()
+        return
+    parts = query.data.split(":")
+    task_id = uuid.UUID(parts[1])
+    target = parts[2]  # "me" | "partner"
+
+    task = await asyncio.to_thread(
+        task_service.assign_couple_task, task_id, update.effective_chat.id, target
+    )
+    if task is None:
+        await query.answer()
+        return
+    actor = (update.effective_user.full_name if update.effective_user else None) or "Seu par"
+    if target == "partner":
+        await query.answer("🤝 Passei a vez pro seu par.")
+        await notify.notify_partner(
+            update.effective_chat.id, context.bot, textos.msg_casal_atribuiu(actor, task.title)
+        )
+    elif target == "joint":
+        await query.answer("💞 Conjunta — precisa dos dois.")
+        await notify.notify_partner(
+            update.effective_chat.id, context.bot, textos.msg_casal_marcou_conjunta(actor, task.title)
+        )
+    elif target == "me":
+        await query.answer("🙋 Agora é com você!")
+    else:  # shared
+        await query.answer("🆓 Sem dono — qualquer um faz.")
+    await _refresh_detail(query, task_id, context)
 
 
 # ---------------------------------------------------------------------------
@@ -286,7 +351,7 @@ async def save_task_note(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if task:
         await update.message.reply_text(
             textos.msg_task_detail(task, subtasks),
-            reply_markup=keyboards.kb_task_detail(task, listas, subtasks),
+            reply_markup=keyboards.kb_task_detail(task, listas, subtasks, show_couple=context.user_data.get(_HAS_COUPLE_KEY, False)),
         )
     return ConversationHandler.END
 
@@ -308,7 +373,7 @@ async def cb_task_note_delete(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
     await query.edit_message_text(
         textos.MSG_NOTA_APAGADA + ("\n\n" + textos.msg_task_detail(task, subtasks) if task else ""),
-        reply_markup=keyboards.kb_task_detail(task, listas, subtasks) if task else None,
+        reply_markup=keyboards.kb_task_detail(task, listas, subtasks, show_couple=context.user_data.get(_HAS_COUPLE_KEY, False)) if task else None,
     )
     return ConversationHandler.END
 
@@ -409,7 +474,7 @@ async def save_task_title(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if task:
         await update.message.reply_text(
             textos.msg_task_detail(task, subtasks),
-            reply_markup=keyboards.kb_task_detail(task, listas, subtasks),
+            reply_markup=keyboards.kb_task_detail(task, listas, subtasks, show_couple=context.user_data.get(_HAS_COUPLE_KEY, False)),
         )
     return ConversationHandler.END
 

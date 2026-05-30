@@ -1,19 +1,22 @@
 """Bootstrap do bot Task Manager — long polling."""
 from __future__ import annotations
 
+import asyncio
 import logging
 
-from telegram import BotCommand, MenuButtonCommands
+from telegram import BotCommand, MenuButtonCommands, Update
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
     CommandHandler,
     MessageHandler,
+    TypeHandler,
     filters,
 )
 
-from src.config import AUTHORIZED_CHAT_ID, TELEGRAM_BOT_TOKEN
+from src.config import BOT_TOKENS, TELEGRAM_BOT_TOKEN
 from src.db.session import run_migrations
+from src.handlers import notify
 from src.handlers.blocker import (
     cb_blocker_aguardar,
     cb_blocker_archive,
@@ -112,10 +115,17 @@ from src.handlers.lists import (
     list_conversation,
 )
 from src.handlers.audio import handle_voice
+from src.handlers.couple import (
+    cmd_casal_convidar,
+    cmd_casal_entrar,
+    cmd_casal_status,
+)
 from src.handlers.medicacoes import cmd_medicacoes, medicacoes_conversation
 from src.handlers.task_detail import (
     cb_sub_complete,
+    cb_task_assign,
     cb_task_detail,
+    cb_task_set_couple,
     cb_task_move_to,
     cb_task_reorder,
     cb_task_set_due,
@@ -157,6 +167,7 @@ _BOT_COMMANDS = [
     BotCommand("exportar",   "Tarefas abertas em texto"),
     BotCommand("foco",       "Iniciar pomodoro (padrão 50+15 min)"),
     BotCommand("medicacoes", "Checklist de medicações"),
+    BotCommand("casal_status", "Ver com quem você está pareado"),
     BotCommand("buscar",     "Buscar tarefa por palavra"),
     BotCommand("pausar",     "Silenciar notificações por N dias"),
     BotCommand("retomar",    "Reativar notificações"),
@@ -172,11 +183,9 @@ async def _setup_menu(app: Application) -> None:
     logger.info("Menu de comandos registrado no Telegram.")
 
 
-def main() -> None:
-    logger.info("Iniciando Task Manager...")
-    run_migrations()
-
-    app = Application.builder().token(TELEGRAM_BOT_TOKEN).post_init(_setup_menu).build()
+def _register_handlers(app: Application) -> None:
+    # Tracking de qual bot atende cada chat (para notificações de casal) — grupo -1 roda primeiro.
+    app.add_handler(TypeHandler(Update, notify.track_bot), group=-1)
 
     # Comandos
     app.add_handler(CommandHandler("start", cmd_start))
@@ -190,6 +199,9 @@ def main() -> None:
     app.add_handler(CommandHandler("quadrantes", cmd_quadrantes))
     app.add_handler(CommandHandler("config", cmd_config))
     app.add_handler(CommandHandler("casal", cmd_casal))
+    app.add_handler(CommandHandler("casal_convidar", cmd_casal_convidar))
+    app.add_handler(CommandHandler("casal_entrar", cmd_casal_entrar))
+    app.add_handler(CommandHandler("casal_status", cmd_casal_status))
     app.add_handler(CommandHandler("buscar", cmd_buscar))
     app.add_handler(CommandHandler("setgrupo", cmd_setgrupo))
     app.add_handler(CommandHandler("tudo", cmd_tudo))
@@ -273,6 +285,8 @@ def main() -> None:
 
     # Detalhe e edição de tarefa
     app.add_handler(CallbackQueryHandler(cb_task_detail, pattern=r"^task_dt:"))
+    app.add_handler(CallbackQueryHandler(cb_task_set_couple, pattern=r"^task_couple:"))
+    app.add_handler(CallbackQueryHandler(cb_task_assign, pattern=r"^task_assign:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_quadrant, pattern=r"^task_q:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_energy, pattern=r"^task_e:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_estimate, pattern=r"^task_m:"))
@@ -311,10 +325,50 @@ def main() -> None:
 
     app.add_error_handler(error_handler)
 
-    setup_jobs(app, AUTHORIZED_CHAT_ID)
 
-    logger.info("Bot pronto. Iniciando long polling...")
-    app.run_polling(drop_pending_updates=True)
+def _build_app(token: str, *, with_menu: bool) -> Application:
+    builder = Application.builder().token(token)
+    if with_menu:
+        builder = builder.post_init(_setup_menu)
+    app = builder.build()
+    _register_handlers(app)
+    return app
+
+
+async def _run_multiple(apps: list[Application]) -> None:
+    """Roda vários Applications (um por token) no mesmo event loop (modo casal multi-bot)."""
+    for app in apps:
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling(drop_pending_updates=True)
+    logger.info("Todos os %d bots em polling.", len(apps))
+    try:
+        while True:
+            await asyncio.sleep(3600)
+    finally:
+        for app in apps:
+            await app.updater.stop()
+            await app.stop()
+            await app.shutdown()
+
+
+def main() -> None:
+    logger.info("Iniciando Task Manager...")
+    run_migrations()
+
+    # App principal: menu + jobs. Apps extras (um por parceiro) só recebem updates;
+    # jobs ficam só no principal para não duplicar resumos/lembretes.
+    primary = _build_app(BOT_TOKENS[0], with_menu=True)
+    setup_jobs(primary)
+
+    if len(BOT_TOKENS) == 1:
+        logger.info("Bot pronto (1 token). Iniciando long polling...")
+        primary.run_polling(drop_pending_updates=True)
+        return
+
+    extras = [_build_app(t, with_menu=False) for t in BOT_TOKENS[1:]]
+    logger.info("Modo casal multi-bot: %d bots.", len(BOT_TOKENS))
+    asyncio.run(_run_multiple([primary, *extras]))
 
 
 if __name__ == "__main__":

@@ -42,7 +42,8 @@ MSG_AJUDA = (
     "🌙 /amanha — o que tem prazo para amanhã\n"
     "📅 /proximos [N] — agenda dos próximos N dias (padrão 7)\n"
     "📁 /projetos — progresso por lista\n"
-    "👫 /casal — mandar as tarefas de casa pro grupo\n"
+    "💞 /casal — tarefas compartilhadas com seu par\n"
+    "   /casal_convidar · /casal_entrar <código> · /casal_status\n"
     "🔍 /buscar <palavra> — achar uma tarefa\n"
     "🏆 /conquistas — ver o que você concluiu na semana\n"
     "📤 /exportar — todas as tarefas abertas em texto\n"
@@ -200,6 +201,7 @@ LIST_EMOJI: dict[str, str] = {
     "projetos": "📁",
     "casa-solo": "🏠",
     "casa-casal": "🏠",
+    "casal": "💞",
     "saude": "💚",
     "ideias": "💡",
 }
@@ -685,6 +687,14 @@ MSG_CASAL_SEM_GRUPO = (
     "Adicione o bot ao grupo e mande /setgrupo lá pra vincular."
 )
 
+MSG_CASAL_SEM_PAR = (
+    "Você ainda não está conectado(a) a ninguém 💞\n\n"
+    "Para compartilhar tarefas com seu par:\n"
+    "• /casal_convidar — eu gero um código pra você enviar\n"
+    "• /casal_entrar <código> — se já recebeu um\n\n"
+    "Depois de conectados, marque tarefas como 💞 Casal na captura."
+)
+
 MSG_CASAL_ENVIADO = "Enviado para o grupo do casal ✅"
 
 MSG_SETGRUPO_OK = "Grupo registrado ✅ Agora o /casal vai enviar as tarefas aqui."
@@ -692,15 +702,128 @@ MSG_SETGRUPO_OK = "Grupo registrado ✅ Agora o /casal vai enviar as tarefas aqu
 MSG_SETGRUPO_APENAS_GRUPO = "Use esse comando em um grupo onde o casal está."
 
 
-def msg_casal(tasks: list) -> str:
+# ---------------------------------------------------------------------------
+# Pareamento de casal (Fase C2)
+# ---------------------------------------------------------------------------
+
+def msg_casal_convite(code: str) -> str:
+    return (
+        "💞 Convite de casal criado!\n\n"
+        f"Mande este código para o seu par:\n\n👉 *{code}*\n\n"
+        "No bot dele(a), é só mandar:\n"
+        f"`/casal_entrar {code}`\n\n"
+        "O código vale por 24 horas."
+    )
+
+
+MSG_CASAL_JA_PAREADO = (
+    "Vocês já estão conectados 💞\n"
+    "Use /casal_status para ver com quem, ou /casal para as tarefas compartilhadas."
+)
+
+MSG_CASAL_PRECISA_START = "Antes de convidar, manda um /start pra eu te conhecer 🙂"
+
+
+def msg_casal_entrou_ok(partner_name: str | None) -> str:
+    nome = partner_name or "seu par"
+    return (
+        f"💞 Pronto! Você e {nome} agora estão conectados.\n\n"
+        "Tarefas de casal vão aparecer para os dois. Use /casal pra ver."
+    )
+
+
+def msg_casal_parceiro_entrou(partner_name: str | None) -> str:
+    nome = partner_name or "Seu par"
+    return (
+        f"💞 {nome} entrou no casal com você!\n\n"
+        "A partir de agora, as tarefas de casal aparecem para os dois."
+    )
+
+
+MSG_CASAL_CODIGO_INVALIDO = "Não achei esse código 🤔 Confere se digitou certinho."
+
+MSG_CASAL_CODIGO_EXPIRADO = (
+    "Esse código expirou ⏳\n"
+    "Peça um novo: a outra pessoa manda /casal_convidar de novo."
+)
+
+MSG_CASAL_CODIGO_USADO = "Esse código já foi usado 🙃 Peça um novo, se precisar."
+
+MSG_CASAL_ENTRAR_JA_PAREADO = (
+    "Você já está num casal 💞\n"
+    "Use /casal_status pra ver com quem."
+)
+
+MSG_CASAL_ENTRAR_PROPRIO = "Esse é o seu próprio código 😄 Mande ele para o seu par."
+
+MSG_CASAL_ENTRAR_CHEIO = "Esse casal já está completo (duas pessoas)."
+
+MSG_CASAL_ENTRAR_SEM_CODIGO = (
+    "Me diz o código junto, assim:\n`/casal_entrar ABC123`"
+)
+
+
+def msg_casal_status_pareado(partner_name: str | None) -> str:
+    nome = partner_name or "seu par"
+    return f"💞 Você está conectado(a) com *{nome}*.\nUse /casal pra ver as tarefas compartilhadas."
+
+
+def msg_casal_concluiu(actor: str, titulo: str) -> str:
+    return _pick(
+        f"💞 {actor} concluiu \"{titulo}\" ✅",
+        f"✅ {actor} deu conta de \"{titulo}\"!",
+        f"💞 Feito por {actor}: \"{titulo}\" ✅",
+    )
+
+
+def msg_casal_compartilhou(actor: str, n: int) -> str:
+    if n == 1:
+        return f"💞 {actor} compartilhou uma tarefa de casal com você."
+    return f"💞 {actor} compartilhou {n} tarefas de casal com você."
+
+
+def msg_casal_atribuiu(actor: str, titulo: str) -> str:
+    return f"💞 {actor} deixou \"{titulo}\" pra você 🙋"
+
+
+MSG_CASAL_STATUS_SOLO = (
+    "Você ainda não está num casal 👤\n\n"
+    "Para conectar com alguém:\n"
+    "• /casal_convidar — eu gero um código pra você compartilhar\n"
+    "• /casal_entrar <código> — se já recebeu um código"
+)
+
+
+def couple_mode_label(task, names: dict | None = None) -> str:
+    """Rótulo curto do modo de uma tarefa de casal: individual / conjunta / sem dono."""
+    names = names or {}
+    if getattr(task, "assigned_to", None):
+        return f"🙋 {names.get(task.assigned_to, 'um de vocês')}"
+    if getattr(task, "couple_joint", False):
+        return "💞 os dois"
+    return "🤝 sem dono"
+
+
+def msg_casal(tasks: list, names: dict | None = None) -> str:
     n = len(tasks)
-    header = f"🏠 Casa (casal) — {n} {'tarefa' if n == 1 else 'tarefas'}:\n"
+    header = f"💞 Casal — {n} {'tarefa' if n == 1 else 'tarefas'}:\n"
     lines = [header]
     for t in tasks:
         q = QUADRANT_EMOJI.get(t.quadrant, "◾") if t.quadrant else "◾"
         est = f" · {t.estimate_min}min" if t.estimate_min else ""
-        lines.append(f"{q} {t.title}{est}")
+        lines.append(f"{q} {t.title}{est}  ({couple_mode_label(t, names)})")
     return "\n".join(lines)
+
+
+def msg_casal_marcou_conjunta(actor: str, titulo: str) -> str:
+    return f"💞 {actor} marcou \"{titulo}\" como conjunta — precisa dos dois 🤝"
+
+
+def msg_casal_concluiu_conjunta(actor: str, titulo: str) -> str:
+    return _pick(
+        f"💞 {actor} fechou a conjunta \"{titulo}\" ✅ Valeu a dupla!",
+        f"🤝 Tarefa dos dois concluída por {actor}: \"{titulo}\" ✅",
+    )
 
 
 # ---------------------------------------------------------------------------
