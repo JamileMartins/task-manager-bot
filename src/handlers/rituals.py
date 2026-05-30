@@ -26,6 +26,7 @@ from src.services.task_service import (
     mark_reminder_sent,
     reschedule_task,
     reset_waiting_since,
+    rollover_medications,
     set_energia_do_dia,
     unblock_task,
 )
@@ -443,6 +444,14 @@ async def cb_overdue_arch(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.edit_message_text("🗑️ Arquivada.")
 
 
+async def rollover_medications_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Virada do dia: descarta medicações não tomadas e agenda nova ocorrência (sem acúmulo)."""
+    chat_id = context.job.data["chat_id"]
+    if is_paused(chat_id):
+        return
+    await asyncio.to_thread(rollover_medications, chat_id)
+
+
 # ---------------------------------------------------------------------------
 # Job setup
 # ---------------------------------------------------------------------------
@@ -454,6 +463,14 @@ def setup_jobs(app, chat_id: int) -> None:
     _schedule_daily(app, chat_id, cfg)
     _schedule_weekly(app, chat_id, cfg)
     app.job_queue.run_repeating(send_reminders, interval=60, first=10, name="reminders")
+    tz = pytz.timezone("America/Fortaleza")
+    app.job_queue.run_daily(
+        rollover_medications_job,
+        time=time(0, 1, 0, tzinfo=tz),
+        name="rollover_meds",
+        data={"chat_id": chat_id},
+    )
+    logger.info("Rollover de medicações agendado às 00:01 para chat_id=%s", chat_id)
 
 
 def _schedule_daily(app, chat_id: int, cfg) -> None:

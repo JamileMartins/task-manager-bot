@@ -181,6 +181,29 @@ def _recurrence_next_due(recurrence: str, base: datetime) -> datetime | None:
     return None
 
 
+def _apply_med_time(dt: datetime, notes: str | None) -> datetime:
+    """Aplica HH:MM de notes no fuso America/Fortaleza, preservando a data local correta."""
+    if not notes:
+        return dt
+    parts = notes.strip().split(":")
+    if len(parts) != 2 or len(parts[1]) != 2:
+        return dt
+    try:
+        h, m = int(parts[0]), int(parts[1])
+        if 0 <= h <= 23 and 0 <= m <= 59:
+            tz = ZoneInfo("America/Fortaleza")
+            local = dt.astimezone(tz) if dt.tzinfo else dt
+            return local.replace(hour=h, minute=m, second=0, microsecond=0)
+    except (ValueError, AttributeError):
+        pass
+    return dt
+
+
+def _med_due_for_date(task: Task, day_start: datetime) -> datetime:
+    """Retorna o due_at correto para a medicação em determinado dia, usando o horário em notes."""
+    return _apply_med_time(day_start, task.notes)
+
+
 def complete_task(task_id: str | uuid.UUID) -> bool:
     uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
     with get_session() as session:
@@ -197,6 +220,7 @@ def complete_task(task_id: str | uuid.UUID) -> bool:
             next_due = _recurrence_next_due(task.recurrence, base)
             if next_due is None:
                 return True
+            next_due = _apply_med_time(next_due, task.notes)
             next_task = Task(
                 user_id=task.user_id,
                 list_id=task.list_id,
@@ -398,24 +422,30 @@ def get_medicacoes(chat_id: int) -> tuple[list[Task], list[Task], list[Task]]:
         )
         if saude is None:
             return [], [], []
+        tz = ZoneInfo("America/Fortaleza")
+        today_start = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = today_start.replace(hour=23, minute=59, second=59, microsecond=999999)
         daily = list(session.scalars(
             select(Task)
-            .where(Task.list_id == saude.id, Task.recurrence == "daily", Task.status == "aberta")
+            .where(
+                Task.list_id == saude.id,
+                Task.recurrence == "daily",
+                Task.status == "aberta",
+                or_(Task.due_at.is_(None), Task.due_at <= today_end),
+            )
             .order_by(Task.sort_order, Task.created_at)
         ).all())
-        tz = ZoneInfo("America/Fortaleza")
-        today_end = datetime.now(tz).replace(hour=23, minute=59, second=59, microsecond=999999)
         weekly = list(session.scalars(
             select(Task)
             .where(
                 Task.list_id == saude.id,
                 Task.recurrence.like("weekly%"),
                 Task.status == "aberta",
-                or_(Task.due_at.is_(None), Task.due_at <= today_end),
+                Task.due_at >= today_start,
+                Task.due_at <= today_end,
             )
             .order_by(Task.sort_order, Task.created_at)
         ).all())
-        today_start = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
         completed_today = list(session.scalars(
             select(Task)
             .where(
@@ -453,17 +483,21 @@ def create_medicacao(chat_id: int, title: str, recurrence: str, med_time: str | 
             session.flush()
         now = _now()
         tz = ZoneInfo(user.timezone or "America/Fortaleza")
+        now_local = now.astimezone(tz)
         if recurrence.startswith("weekly:"):
             try:
                 target_dow = int(recurrence.split(":")[1])
-                now_local = now.astimezone(tz)
                 days_ahead = (target_dow - now_local.weekday()) % 7
-                first_due = (now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-                             + timedelta(days=days_ahead))
+                day_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+                first_due = _apply_med_time(day_start + timedelta(days=days_ahead), med_time)
             except (ValueError, IndexError):
                 first_due = now
-        else:
-            first_due = now
+        else:  # daily
+            first_due = _apply_med_time(
+                now_local.replace(second=0, microsecond=0), med_time
+            )
+            if med_time and first_due < now_local:
+                first_due += timedelta(days=1)
         task = Task(
             user_id=user.id,
             list_id=saude.id,
@@ -479,6 +513,53 @@ def create_medicacao(chat_id: int, title: str, recurrence: str, med_time: str | 
         session.add(task)
         session.flush()
         return task
+
+
+def rollover_medications(chat_id: int) -> None:
+    """Ao virar o dia, descarta medicações não tomadas e agenda a próxima ocorrência.
+
+    Garante que o histórico do dia não acumule para o dia seguinte:
+    - daily: due_at avança para hoje no horário configurado
+    - weekly: due_at avança para a próxima ocorrência do dia da semana
+    """
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return
+        saude = session.scalar(
+            select(TaskList).where(
+                TaskList.user_id == user.id,
+                TaskList.slug == "saude",
+                TaskList.archived.is_(False),
+            )
+        )
+        if saude is None:
+            return
+
+        tz = ZoneInfo(user.timezone or "America/Fortaleza")
+        now = _now()
+        today_start = now.astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+
+        stale = list(session.scalars(
+            select(Task).where(
+                Task.list_id == saude.id,
+                Task.recurrence.isnot(None),
+                Task.status == "aberta",
+                Task.due_at.isnot(None),
+                Task.due_at < today_start,
+            )
+        ).all())
+
+        for task in stale:
+            if task.recurrence == "daily":
+                next_due = _med_due_for_date(task, today_start)
+            else:
+                next_due = _recurrence_next_due(task.recurrence, today_start)
+            if next_due is None:
+                continue
+            task.due_at = next_due
+            task.last_touched_at = now
+            _sync_reminder(session, task)
 
 
 def get_all_open_tasks(chat_id: int) -> list[TaskGroup]:
