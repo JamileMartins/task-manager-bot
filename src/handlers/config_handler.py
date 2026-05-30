@@ -8,7 +8,7 @@ import pytz
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from src.config import AUTHORIZED_CHAT_ID
+from src.handlers.common import is_authorized
 from src.services.task_service import get_config, update_config
 from src.utils.keyboards import (
     kb_config,
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 def _guard(update: Update) -> bool:
-    return bool(update.effective_chat and update.effective_chat.id == AUTHORIZED_CHAT_ID)
+    return is_authorized(update)
 
 
 async def cmd_config(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

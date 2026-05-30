@@ -92,6 +92,7 @@ def kb_classificacao_resumo() -> InlineKeyboardMarkup:
 def kb_ajustar_tarefa(
     task_idx: int,
     listas: list[dict],
+    show_couple: bool = False,
 ) -> InlineKeyboardMarkup:
     """Teclado de seleção de lista para uma tarefa durante o ajuste item a item."""
     from src.utils.textos import lista_emoji
@@ -108,7 +109,10 @@ def kb_ajustar_tarefa(
             row = []
     if row:
         rows.append(row)
-    rows.append([InlineKeyboardButton("📥 Inbox", callback_data=f"adj:{task_idx}:-1")])
+    bottom = [InlineKeyboardButton("📥 Inbox", callback_data=f"adj:{task_idx}:-1")]
+    if show_couple:
+        bottom.append(InlineKeyboardButton("💞 Casal", callback_data=f"adj:{task_idx}:-2"))
+    rows.append(bottom)
     return InlineKeyboardMarkup(rows)
 
 
@@ -181,7 +185,7 @@ def kb_inbox(tasks: Sequence[Task]) -> InlineKeyboardMarkup:
 # Detalhe de tarefa (F3)
 # ---------------------------------------------------------------------------
 
-def kb_task_detail(task: Task, listas: list[dict], subtasks=None) -> InlineKeyboardMarkup:
+def kb_task_detail(task: Task, listas: list[dict], subtasks=None, show_couple: bool = False) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
 
     if task.status == "aguardando":
@@ -237,6 +241,12 @@ def kb_task_detail(task: Task, listas: list[dict], subtasks=None) -> InlineKeybo
             InlineKeyboardButton(nota_label, callback_data=f"task_note:{task.id}"),
             InlineKeyboardButton("✏️ Título", callback_data=f"task_title:{task.id}"),
         ])
+
+        # Alternância pessoal <-> casal (só quando faz sentido).
+        if task.couple_id:
+            rows.append([InlineKeyboardButton("👤 Tornar pessoal", callback_data=f"task_couple:{task.id}:0")])
+        elif show_couple:
+            rows.append([InlineKeyboardButton("💞 Tornar do casal", callback_data=f"task_couple:{task.id}:1")])
 
     if task.list_id:
         rows.append([InlineKeyboardButton("← Voltar", callback_data=f"view_list:{task.list_id}")])

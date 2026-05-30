@@ -12,7 +12,7 @@ from telegram.ext import (
     filters,
 )
 
-from src.config import AUTHORIZED_CHAT_ID, TELEGRAM_BOT_TOKEN
+from src.config import TELEGRAM_BOT_TOKEN
 from src.db.session import run_migrations
 from src.handlers.blocker import (
     cb_blocker_aguardar,
@@ -112,10 +112,16 @@ from src.handlers.lists import (
     list_conversation,
 )
 from src.handlers.audio import handle_voice
+from src.handlers.couple import (
+    cmd_casal_convidar,
+    cmd_casal_entrar,
+    cmd_casal_status,
+)
 from src.handlers.medicacoes import cmd_medicacoes, medicacoes_conversation
 from src.handlers.task_detail import (
     cb_sub_complete,
     cb_task_detail,
+    cb_task_set_couple,
     cb_task_move_to,
     cb_task_reorder,
     cb_task_set_due,
@@ -157,6 +163,7 @@ _BOT_COMMANDS = [
     BotCommand("exportar",   "Tarefas abertas em texto"),
     BotCommand("foco",       "Iniciar pomodoro (padrão 50+15 min)"),
     BotCommand("medicacoes", "Checklist de medicações"),
+    BotCommand("casal_status", "Ver com quem você está pareado"),
     BotCommand("buscar",     "Buscar tarefa por palavra"),
     BotCommand("pausar",     "Silenciar notificações por N dias"),
     BotCommand("retomar",    "Reativar notificações"),
@@ -190,6 +197,9 @@ def main() -> None:
     app.add_handler(CommandHandler("quadrantes", cmd_quadrantes))
     app.add_handler(CommandHandler("config", cmd_config))
     app.add_handler(CommandHandler("casal", cmd_casal))
+    app.add_handler(CommandHandler("casal_convidar", cmd_casal_convidar))
+    app.add_handler(CommandHandler("casal_entrar", cmd_casal_entrar))
+    app.add_handler(CommandHandler("casal_status", cmd_casal_status))
     app.add_handler(CommandHandler("buscar", cmd_buscar))
     app.add_handler(CommandHandler("setgrupo", cmd_setgrupo))
     app.add_handler(CommandHandler("tudo", cmd_tudo))
@@ -273,6 +283,7 @@ def main() -> None:
 
     # Detalhe e edição de tarefa
     app.add_handler(CallbackQueryHandler(cb_task_detail, pattern=r"^task_dt:"))
+    app.add_handler(CallbackQueryHandler(cb_task_set_couple, pattern=r"^task_couple:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_quadrant, pattern=r"^task_q:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_energy, pattern=r"^task_e:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_estimate, pattern=r"^task_m:"))
@@ -311,7 +322,7 @@ def main() -> None:
 
     app.add_error_handler(error_handler)
 
-    setup_jobs(app, AUTHORIZED_CHAT_ID)
+    setup_jobs(app)
 
     logger.info("Bot pronto. Iniciando long polling...")
     app.run_polling(drop_pending_updates=True)

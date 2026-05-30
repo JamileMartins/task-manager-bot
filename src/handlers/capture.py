@@ -31,11 +31,13 @@ def _set_pending(
     context: ContextTypes.DEFAULT_TYPE,
     tasks: list[dict],
     listas: list[dict],
+    has_couple: bool = False,
 ) -> None:
     context.user_data[_PENDING_KEY] = {
         "tasks": tasks,
         "listas": listas,
         "adj_index": 0,
+        "has_couple": has_couple,
     }
 
 
@@ -73,7 +75,8 @@ async def process_text_capture(
             ai_service.classificar_brain_dump, text, nomes_listas
         )
 
-        _set_pending(context, tarefas, listas_dicts)
+        has_couple = await asyncio.to_thread(task_service.has_couple, chat_id)
+        _set_pending(context, tarefas, listas_dicts, has_couple)
         await msg.reply_text(
             textos.msg_classificacao_resumo(tarefas),
             reply_markup=keyboards.kb_classificacao_resumo(),
@@ -187,10 +190,15 @@ async def cb_adj_task(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     listas = pending["listas"]
 
     if 0 <= task_idx < len(tasks):
-        if list_idx == -1:
+        if list_idx == -1:  # Inbox
             tasks[task_idx]["lista_sugerida"] = None
+            tasks[task_idx]["casal"] = False
+        elif list_idx == -2:  # Casal
+            tasks[task_idx]["lista_sugerida"] = None
+            tasks[task_idx]["casal"] = True
         elif 0 <= list_idx < len(listas):
             tasks[task_idx]["lista_sugerida"] = listas[list_idx]["name"]
+            tasks[task_idx]["casal"] = False
 
     next_idx = task_idx + 1
     pending["adj_index"] = next_idx
@@ -221,7 +229,7 @@ async def _show_task_for_adjustment(query, pending: dict) -> None:
     listas = pending["listas"]
     task = tasks[idx]
     texto = textos.msg_ajustar_tarefa(task, idx, len(tasks))
-    kb = keyboards.kb_ajustar_tarefa(idx, listas)
+    kb = keyboards.kb_ajustar_tarefa(idx, listas, show_couple=pending.get("has_couple", False))
     await query.edit_message_text(texto, reply_markup=kb)
 
 
