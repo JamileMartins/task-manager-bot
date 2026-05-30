@@ -173,3 +173,17 @@ def test_get_partner_casal_de_um_membro_e_none(svc):
     # Casal existe mas só tem 1 membro → sem parceiro ainda.
     assert couple_service.get_couple_id(111) is not None
     assert couple_service.get_partner(111) is None
+
+
+def test_member_names_retorna_os_dois(svc):
+    a = _user(svc, 111, "Ana")
+    b = _user(svc, 222, "Beto")
+    code = couple_service.create_invite(111).code
+    couple_service.accept_invite(222, code)
+    names = couple_service.member_names(111)
+    assert names == {a.id: "Ana", b.id: "Beto"}
+
+
+def test_member_names_sem_casal_vazio(svc):
+    _user(svc, 111, "Ana")
+    assert couple_service.member_names(111) == {}

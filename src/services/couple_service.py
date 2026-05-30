@@ -109,6 +109,23 @@ def partner_chat_id(chat_id: int) -> Optional[int]:
     return partner["chat_id"] if partner else None
 
 
+def member_names(chat_id: int) -> dict:
+    """Mapa user_id -> nome dos membros do casal (para rotular o dono das tarefas)."""
+    with get_session() as session:
+        user = _user_by_chat(session, chat_id)
+        if user is None:
+            return {}
+        m = _membership(session, user.id)
+        if m is None:
+            return {}
+        rows = session.execute(
+            select(CoupleMember.user_id, User.name)
+            .join(User, User.id == CoupleMember.user_id)
+            .where(CoupleMember.couple_id == m.couple_id)
+        ).all()
+        return {uid: name for uid, name in rows}
+
+
 # ---------------------------------------------------------------------------
 # Criar convite
 # ---------------------------------------------------------------------------

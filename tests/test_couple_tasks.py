@@ -13,7 +13,7 @@ import pytest
 
 from src.db.models import Couple, CoupleMember, Task, User
 from src.services import task_service
-from src.utils import keyboards
+from src.utils import keyboards, textos
 
 
 @contextmanager
@@ -223,6 +223,73 @@ def test_assign_em_tarefa_pessoal_retorna_none(svc):
     a = _user(svc, 111, "Ana")
     t = _personal(svc, a, "pessoal")
     assert task_service.assign_couple_task(t.id, 111, "me") is None
+
+
+# ---------------------------------------------------------------------------
+# Modos: conjunta (precisa dos dois) e sem dono
+# ---------------------------------------------------------------------------
+
+def test_assign_joint_marca_conjunta(svc):
+    a = _user(svc, 111, "Ana")
+    b = _user(svc, 222, "Beto")
+    couple = _couple(svc, a, b)
+    t = _couple_task(svc, a, couple, "comprar móveis")
+    updated = task_service.assign_couple_task(t.id, 111, "joint")
+    assert updated.couple_joint is True
+    assert updated.assigned_to is None
+
+
+def test_assign_shared_limpa_dono_e_conjunta(svc):
+    a = _user(svc, 111, "Ana")
+    couple = _couple(svc, a)
+    t = _couple_task(svc, a, couple, "x")
+    t.assigned_to = a.id
+    t.couple_joint = True
+    svc.flush()
+    updated = task_service.assign_couple_task(t.id, 111, "shared")
+    assert updated.assigned_to is None and updated.couple_joint is False
+
+
+def test_assign_individual_limpa_conjunta(svc):
+    a = _user(svc, 111, "Ana")
+    couple = _couple(svc, a)
+    t = _couple_task(svc, a, couple, "x")
+    t.couple_joint = True
+    svc.flush()
+    updated = task_service.assign_couple_task(t.id, 111, "me")
+    assert updated.assigned_to == a.id and updated.couple_joint is False
+
+
+# ---------------------------------------------------------------------------
+# Rótulo de modo (textos.couple_mode_label)
+# ---------------------------------------------------------------------------
+
+def test_mode_label_individual_mostra_nome():
+    uid = uuid.uuid4()
+    t = Task(id=uuid.uuid4(), title="x", assigned_to=uid, couple_joint=False)
+    assert "Ana" in textos.couple_mode_label(t, {uid: "Ana"})
+
+
+def test_mode_label_conjunta():
+    t = Task(id=uuid.uuid4(), title="x", assigned_to=None, couple_joint=True)
+    assert "os dois" in textos.couple_mode_label(t)
+
+
+def test_mode_label_sem_dono():
+    t = Task(id=uuid.uuid4(), title="x", assigned_to=None, couple_joint=False)
+    assert "sem dono" in textos.couple_mode_label(t)
+
+
+# ---------------------------------------------------------------------------
+# Teclado: ✓ no modo atual
+# ---------------------------------------------------------------------------
+
+def test_kb_marca_conjunta_atual():
+    t = Task(id=uuid.uuid4(), title="x", status="aberta", couple_id=uuid.uuid4(),
+             list_id=None, assigned_to=None, couple_joint=True)
+    texts = _kb_texts(keyboards.kb_task_detail(t, [], None, show_couple=True))
+    assert any("Conjunta ✓" in x for x in texts)
+    assert any("Sem dono" in x and "✓" not in x for x in texts)
 
 
 # ---------------------------------------------------------------------------

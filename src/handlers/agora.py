@@ -92,9 +92,11 @@ async def cb_agora_concluir(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await asyncio.to_thread(task_service.complete_task, task_id)
         if task is not None and getattr(task, "couple_id", None) is not None:
             actor = (update.effective_user.full_name if update.effective_user else None) or "Seu par"
-            await notify.notify_partner(
-                update.effective_chat.id, context.bot, textos.msg_casal_concluiu(actor, task.title)
-            )
+            if getattr(task, "couple_joint", False):
+                texto = textos.msg_casal_concluiu_conjunta(actor, task.title)
+            else:
+                texto = textos.msg_casal_concluiu(actor, task.title)
+            await notify.notify_partner(update.effective_chat.id, context.bot, texto)
         await query.edit_message_text(textos.msg_conclusao())
     except Exception:
         logger.exception("Erro ao concluir tarefa pelo /agora")

@@ -794,15 +794,36 @@ MSG_CASAL_STATUS_SOLO = (
 )
 
 
-def msg_casal(tasks: list) -> str:
+def couple_mode_label(task, names: dict | None = None) -> str:
+    """Rótulo curto do modo de uma tarefa de casal: individual / conjunta / sem dono."""
+    names = names or {}
+    if getattr(task, "assigned_to", None):
+        return f"🙋 {names.get(task.assigned_to, 'um de vocês')}"
+    if getattr(task, "couple_joint", False):
+        return "💞 os dois"
+    return "🤝 sem dono"
+
+
+def msg_casal(tasks: list, names: dict | None = None) -> str:
     n = len(tasks)
-    header = f"🏠 Casa (casal) — {n} {'tarefa' if n == 1 else 'tarefas'}:\n"
+    header = f"💞 Casal — {n} {'tarefa' if n == 1 else 'tarefas'}:\n"
     lines = [header]
     for t in tasks:
         q = QUADRANT_EMOJI.get(t.quadrant, "◾") if t.quadrant else "◾"
         est = f" · {t.estimate_min}min" if t.estimate_min else ""
-        lines.append(f"{q} {t.title}{est}")
+        lines.append(f"{q} {t.title}{est}  ({couple_mode_label(t, names)})")
     return "\n".join(lines)
+
+
+def msg_casal_marcou_conjunta(actor: str, titulo: str) -> str:
+    return f"💞 {actor} marcou \"{titulo}\" como conjunta — precisa dos dois 🤝"
+
+
+def msg_casal_concluiu_conjunta(actor: str, titulo: str) -> str:
+    return _pick(
+        f"💞 {actor} fechou a conjunta \"{titulo}\" ✅ Valeu a dupla!",
+        f"🤝 Tarefa dos dois concluída por {actor}: \"{titulo}\" ✅",
+    )
 
 
 # ---------------------------------------------------------------------------

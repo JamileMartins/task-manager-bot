@@ -12,7 +12,7 @@ from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
 from src.config import ALLOWED_CHAT_IDS, AUTHORIZED_CHAT_ID, DEFAULT_TIMEZONE
-from src.services import task_service
+from src.services import couple_service, task_service
 from src.utils import keyboards, textos
 
 logger = logging.getLogger(__name__)
@@ -241,7 +241,8 @@ async def cmd_casal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not tasks:
             await msg.reply_text(textos.MSG_CASAL_VAZIA)
             return
-        await msg.reply_text(textos.msg_casal(tasks), reply_markup=keyboards.kb_tasks(tasks))
+        names = await asyncio.to_thread(couple_service.member_names, chat_id)
+        await msg.reply_text(textos.msg_casal(tasks, names), reply_markup=keyboards.kb_tasks(tasks))
     except Exception:
         logger.exception("Erro em /casal")
         await msg.reply_text(textos.MSG_ERRO_GENERICO)

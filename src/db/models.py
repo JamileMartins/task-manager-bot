@@ -77,6 +77,10 @@ class Task(Base):
     assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
+    # Tarefa de casal "conjunta": precisa dos dois (rótulo). Conclusão segue única.
+    # Estados: assigned_to setado = individual; nulo + couple_joint falso = sem dono;
+    # couple_joint verdadeiro = conjunta.
+    couple_joint: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     quadrant: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)

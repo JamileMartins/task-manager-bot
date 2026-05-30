@@ -242,11 +242,19 @@ def kb_task_detail(task: Task, listas: list[dict], subtasks=None, show_couple: b
             InlineKeyboardButton("✏️ Título", callback_data=f"task_title:{task.id}"),
         ])
 
-        # Alternância pessoal <-> casal (só quando faz sentido).
+        # Modo da tarefa de casal: individual (minha/do par), sem dono ou conjunta.
         if task.couple_id:
+            joint = bool(getattr(task, "couple_joint", False))
+            individual = task.assigned_to is not None
+            shared_mark = " ✓" if (not joint and not individual) else ""
+            joint_mark = " ✓" if joint else ""
             rows.append([
                 InlineKeyboardButton("🙋 Minha vez", callback_data=f"task_assign:{task.id}:me"),
                 InlineKeyboardButton("🤝 Vez do par", callback_data=f"task_assign:{task.id}:partner"),
+            ])
+            rows.append([
+                InlineKeyboardButton("🆓 Sem dono" + shared_mark, callback_data=f"task_assign:{task.id}:shared"),
+                InlineKeyboardButton("💞 Conjunta" + joint_mark, callback_data=f"task_assign:{task.id}:joint"),
             ])
             rows.append([InlineKeyboardButton("👤 Tornar pessoal", callback_data=f"task_couple:{task.id}:0")])
         elif show_couple:

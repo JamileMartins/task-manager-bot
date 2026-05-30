@@ -127,9 +127,11 @@ async def _notify_if_couple(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     if task is None or getattr(task, "couple_id", None) is None:
         return
     actor = (update.effective_user.full_name if update.effective_user else None) or "Seu par"
-    await notify.notify_partner(
-        update.effective_chat.id, context.bot, textos.msg_casal_concluiu(actor, task.title)
-    )
+    if getattr(task, "couple_joint", False):
+        texto = textos.msg_casal_concluiu_conjunta(actor, task.title)
+    else:
+        texto = textos.msg_casal_concluiu(actor, task.title)
+    await notify.notify_partner(update.effective_chat.id, context.bot, texto)
 
 
 async def _refresh_after_complete(query, chat_id: int, completed_task_id: str) -> None:

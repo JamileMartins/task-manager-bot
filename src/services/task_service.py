@@ -449,9 +449,13 @@ def set_task_couple(task_id: str | uuid.UUID, chat_id: int, make_couple: bool) -
 
 
 def assign_couple_task(task_id: str | uuid.UUID, chat_id: int, target: str) -> Optional[Task]:
-    """Define de quem é a vez numa tarefa de casal.
+    """Define o modo/dono de uma tarefa de casal.
 
-    target: "me" (quem chamou), "partner" (o outro membro) ou "none" (sem dono).
+    target:
+      "me"      → individual, de quem chamou;
+      "partner" → individual, do outro membro;
+      "joint"   → conjunta (precisa dos dois);
+      "shared"/"none" → sem dono (qualquer um faz).
     Retorna a Task atualizada, ou None se não for tarefa de casal / inválida.
     """
     uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
@@ -462,6 +466,7 @@ def assign_couple_task(task_id: str | uuid.UUID, chat_id: int, target: str) -> O
             return None
         if target == "me":
             task.assigned_to = user.id
+            task.couple_joint = False
         elif target == "partner":
             task.assigned_to = session.scalar(
                 select(CoupleMember.user_id).where(
@@ -469,8 +474,13 @@ def assign_couple_task(task_id: str | uuid.UUID, chat_id: int, target: str) -> O
                     CoupleMember.user_id != user.id,
                 )
             )
-        else:  # "none"
+            task.couple_joint = False
+        elif target == "joint":
             task.assigned_to = None
+            task.couple_joint = True
+        else:  # "shared"/"none"
+            task.assigned_to = None
+            task.couple_joint = False
         task.last_touched_at = _now()
         return task
 

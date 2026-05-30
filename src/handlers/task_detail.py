@@ -130,14 +130,21 @@ async def cb_task_assign(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if task is None:
         await query.answer()
         return
+    actor = (update.effective_user.full_name if update.effective_user else None) or "Seu par"
     if target == "partner":
         await query.answer("🤝 Passei a vez pro seu par.")
-        actor = (update.effective_user.full_name if update.effective_user else None) or "Seu par"
         await notify.notify_partner(
             update.effective_chat.id, context.bot, textos.msg_casal_atribuiu(actor, task.title)
         )
-    else:
+    elif target == "joint":
+        await query.answer("💞 Conjunta — precisa dos dois.")
+        await notify.notify_partner(
+            update.effective_chat.id, context.bot, textos.msg_casal_marcou_conjunta(actor, task.title)
+        )
+    elif target == "me":
         await query.answer("🙋 Agora é com você!")
+    else:  # shared
+        await query.answer("🆓 Sem dono — qualquer um faz.")
     await _refresh_detail(query, task_id, context)
 
 
