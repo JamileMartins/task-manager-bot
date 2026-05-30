@@ -448,6 +448,33 @@ def set_task_couple(task_id: str | uuid.UUID, chat_id: int, make_couple: bool) -
         return task
 
 
+def assign_couple_task(task_id: str | uuid.UUID, chat_id: int, target: str) -> Optional[Task]:
+    """Define de quem é a vez numa tarefa de casal.
+
+    target: "me" (quem chamou), "partner" (o outro membro) ou "none" (sem dono).
+    Retorna a Task atualizada, ou None se não for tarefa de casal / inválida.
+    """
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        task = session.get(Task, uid)
+        if user is None or task is None or task.couple_id is None:
+            return None
+        if target == "me":
+            task.assigned_to = user.id
+        elif target == "partner":
+            task.assigned_to = session.scalar(
+                select(CoupleMember.user_id).where(
+                    CoupleMember.couple_id == task.couple_id,
+                    CoupleMember.user_id != user.id,
+                )
+            )
+        else:  # "none"
+            task.assigned_to = None
+        task.last_touched_at = _now()
+        return task
+
+
 def search_tasks(chat_id: int, term: str) -> list[Task]:
     """Busca tarefas não concluídas/arquivadas por palavra-chave no título ou notas."""
     with get_session() as session:

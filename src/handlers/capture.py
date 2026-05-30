@@ -10,6 +10,7 @@ from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
 from src.handlers.common import deny_unauthorized, is_authorized
+from src.handlers import notify
 from src.services import ai_service, task_service
 from src.utils import keyboards, textos
 
@@ -43,6 +44,17 @@ def _set_pending(
 
 def _clear_pending(context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.pop(_PENDING_KEY, None)
+
+
+async def _notify_couple_created(update: Update, context: ContextTypes.DEFAULT_TYPE, saved: list) -> None:
+    """Avisa o parceiro quando tarefas de casal foram criadas na captura."""
+    n = sum(1 for t in saved if getattr(t, "couple_id", None) is not None)
+    if n == 0:
+        return
+    actor = (update.effective_user.full_name if update.effective_user else None) or "Seu par"
+    await notify.notify_partner(
+        update.effective_chat.id, context.bot, textos.msg_casal_compartilhou(actor, n)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +143,7 @@ async def cb_approve_capture(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         _clear_pending(context)
         await query.edit_message_text(textos.msg_captura_salva(len(saved)))
+        await _notify_couple_created(update, context, saved)
     except Exception:
         logger.exception("Erro ao salvar tarefas classificadas")
         await query.edit_message_text(textos.MSG_ERRO_GENERICO)
@@ -218,6 +231,7 @@ async def cb_adj_task(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             )
             _clear_pending(context)
             await query.edit_message_text(textos.msg_captura_salva(len(saved)))
+            await _notify_couple_created(update, context, saved)
         except Exception:
             logger.exception("Erro ao salvar tarefas após ajuste")
             await query.edit_message_text(textos.MSG_ERRO_GENERICO)

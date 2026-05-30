@@ -9,6 +9,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from src.handlers.common import deny_unauthorized, is_authorized
+from src.handlers import notify
 from src.services import task_service
 from src.utils import keyboards, textos
 
@@ -111,12 +112,24 @@ async def cb_complete_task(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     task_id = query.data.split(":")[1]
     try:
+        task = await asyncio.to_thread(task_service.get_task_with_list, task_id)
         await asyncio.to_thread(task_service.complete_task, task_id)
+        await _notify_if_couple(update, context, task)
         # Recarrega a lista após conclusão
         await _refresh_after_complete(query, update.effective_chat.id, task_id)
     except Exception:
         logger.exception("Erro ao concluir tarefa %s", task_id)
         await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+
+
+async def _notify_if_couple(update: Update, context: ContextTypes.DEFAULT_TYPE, task) -> None:
+    """Avisa o parceiro quando uma tarefa de casal é concluída."""
+    if task is None or getattr(task, "couple_id", None) is None:
+        return
+    actor = (update.effective_user.full_name if update.effective_user else None) or "Seu par"
+    await notify.notify_partner(
+        update.effective_chat.id, context.bot, textos.msg_casal_concluiu(actor, task.title)
+    )
 
 
 async def _refresh_after_complete(query, chat_id: int, completed_task_id: str) -> None:

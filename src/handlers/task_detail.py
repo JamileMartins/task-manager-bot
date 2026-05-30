@@ -12,6 +12,7 @@ from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes, Con
 
 from src.config import DEFAULT_TIMEZONE
 from src.handlers.common import deny_unauthorized, is_authorized
+from src.handlers import notify
 from src.services import task_service
 from src.utils import keyboards, textos
 
@@ -106,6 +107,37 @@ async def cb_task_set_couple(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.answer("Você ainda não está num casal 💞 Use /casal_convidar.", show_alert=True)
         return
     await query.answer("💞 Agora é do casal!" if make_couple else "👤 Agora é pessoal.")
+    if make_couple:
+        actor = (update.effective_user.full_name if update.effective_user else None) or "Seu par"
+        await notify.notify_partner(
+            update.effective_chat.id, context.bot, textos.msg_casal_compartilhou(actor, 1)
+        )
+    await _refresh_detail(query, task_id, context)
+
+
+async def cb_task_assign(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    if not is_authorized(update):
+        await query.answer()
+        return
+    parts = query.data.split(":")
+    task_id = uuid.UUID(parts[1])
+    target = parts[2]  # "me" | "partner"
+
+    task = await asyncio.to_thread(
+        task_service.assign_couple_task, task_id, update.effective_chat.id, target
+    )
+    if task is None:
+        await query.answer()
+        return
+    if target == "partner":
+        await query.answer("🤝 Passei a vez pro seu par.")
+        actor = (update.effective_user.full_name if update.effective_user else None) or "Seu par"
+        await notify.notify_partner(
+            update.effective_chat.id, context.bot, textos.msg_casal_atribuiu(actor, task.title)
+        )
+    else:
+        await query.answer("🙋 Agora é com você!")
     await _refresh_detail(query, task_id, context)
 
 

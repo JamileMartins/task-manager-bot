@@ -768,6 +768,24 @@ def msg_casal_status_pareado(partner_name: str | None) -> str:
     return f"💞 Você está conectado(a) com *{nome}*.\nUse /casal pra ver as tarefas compartilhadas."
 
 
+def msg_casal_concluiu(actor: str, titulo: str) -> str:
+    return _pick(
+        f"💞 {actor} concluiu \"{titulo}\" ✅",
+        f"✅ {actor} deu conta de \"{titulo}\"!",
+        f"💞 Feito por {actor}: \"{titulo}\" ✅",
+    )
+
+
+def msg_casal_compartilhou(actor: str, n: int) -> str:
+    if n == 1:
+        return f"💞 {actor} compartilhou uma tarefa de casal com você."
+    return f"💞 {actor} compartilhou {n} tarefas de casal com você."
+
+
+def msg_casal_atribuiu(actor: str, titulo: str) -> str:
+    return f"💞 {actor} deixou \"{titulo}\" pra você 🙋"
+
+
 MSG_CASAL_STATUS_SOLO = (
     "Você ainda não está num casal 👤\n\n"
     "Para conectar com alguém:\n"

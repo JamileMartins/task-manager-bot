@@ -32,6 +32,9 @@ class User(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="America/Fortaleza")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Google Calendar (C6) — preenchidos só após o usuário autorizar via OAuth.
+    google_refresh_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    google_calendar_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     lists: Mapped[List[TaskList]] = relationship(back_populates="user", cascade="all, delete-orphan")
     tasks: Mapped[List[Task]] = relationship(
@@ -91,6 +94,9 @@ class Task(Base):
     )
     waiting_since: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     due_alerted: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
+    # Google Calendar (C6) — id do evento espelhado e quando foi sincronizado.
+    gcal_event_id: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    gcal_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

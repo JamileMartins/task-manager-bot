@@ -244,6 +244,10 @@ def kb_task_detail(task: Task, listas: list[dict], subtasks=None, show_couple: b
 
         # Alternância pessoal <-> casal (só quando faz sentido).
         if task.couple_id:
+            rows.append([
+                InlineKeyboardButton("🙋 Minha vez", callback_data=f"task_assign:{task.id}:me"),
+                InlineKeyboardButton("🤝 Vez do par", callback_data=f"task_assign:{task.id}:partner"),
+            ])
             rows.append([InlineKeyboardButton("👤 Tornar pessoal", callback_data=f"task_couple:{task.id}:0")])
         elif show_couple:
             rows.append([InlineKeyboardButton("💞 Tornar do casal", callback_data=f"task_couple:{task.id}:1")])

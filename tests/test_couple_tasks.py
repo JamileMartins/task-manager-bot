@@ -188,6 +188,44 @@ def test_has_couple(svc):
 
 
 # ---------------------------------------------------------------------------
+# C5 — assign_couple_task (de quem é a vez)
+# ---------------------------------------------------------------------------
+
+def test_assign_para_mim(svc):
+    a = _user(svc, 111, "Ana")
+    b = _user(svc, 222, "Beto")
+    couple = _couple(svc, a, b)
+    t = _couple_task(svc, a, couple, "tarefa")
+    updated = task_service.assign_couple_task(t.id, 111, "me")
+    assert updated.assigned_to == a.id
+
+
+def test_assign_para_o_par(svc):
+    a = _user(svc, 111, "Ana")
+    b = _user(svc, 222, "Beto")
+    couple = _couple(svc, a, b)
+    t = _couple_task(svc, a, couple, "tarefa")
+    updated = task_service.assign_couple_task(t.id, 111, "partner")
+    assert updated.assigned_to == b.id
+
+
+def test_assign_none_limpa(svc):
+    a = _user(svc, 111, "Ana")
+    couple = _couple(svc, a)
+    t = _couple_task(svc, a, couple, "tarefa")
+    t.assigned_to = a.id
+    svc.flush()
+    updated = task_service.assign_couple_task(t.id, 111, "none")
+    assert updated.assigned_to is None
+
+
+def test_assign_em_tarefa_pessoal_retorna_none(svc):
+    a = _user(svc, 111, "Ana")
+    t = _personal(svc, a, "pessoal")
+    assert task_service.assign_couple_task(t.id, 111, "me") is None
+
+
+# ---------------------------------------------------------------------------
 # Teclado do detalhe — botão pessoal <-> casal
 # ---------------------------------------------------------------------------
 

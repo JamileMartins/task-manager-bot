@@ -10,6 +10,7 @@ from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
 from src.handlers.common import deny_unauthorized, is_authorized
+from src.handlers import notify
 from src.services import task_service
 from src.utils import keyboards, textos
 
@@ -87,7 +88,13 @@ async def cb_agora_concluir(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return
     task_id = query.data.split(":")[1]
     try:
+        task = await asyncio.to_thread(task_service.get_task_with_list, task_id)
         await asyncio.to_thread(task_service.complete_task, task_id)
+        if task is not None and getattr(task, "couple_id", None) is not None:
+            actor = (update.effective_user.full_name if update.effective_user else None) or "Seu par"
+            await notify.notify_partner(
+                update.effective_chat.id, context.bot, textos.msg_casal_concluiu(actor, task.title)
+            )
         await query.edit_message_text(textos.msg_conclusao())
     except Exception:
         logger.exception("Erro ao concluir tarefa pelo /agora")
