@@ -189,7 +189,7 @@ def kb_inbox(tasks: Sequence[Task]) -> InlineKeyboardMarkup:
 # Detalhe de tarefa (F3)
 # ---------------------------------------------------------------------------
 
-def kb_task_detail(task: Task, listas: list[dict], subtasks=None, show_couple: bool = False) -> InlineKeyboardMarkup:
+def kb_task_detail(task: Task, listas: list[dict], subtasks=None, show_couple: bool = False, show_category: bool = False) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
 
     if task.status == "aguardando":
@@ -239,6 +239,17 @@ def kb_task_detail(task: Task, listas: list[dict], subtasks=None, show_couple: b
                 rows.append([InlineKeyboardButton(
                     f"✅ {s.title}", callback_data=f"sub_done:{s.id}:{task.id}"
                 )])
+
+        if show_category:
+            cat = task.category
+            med_mark = " ✓" if cat == "medicacao" else ""
+            age_mark = " ✓" if cat == "agendamento" else ""
+            sem_mark = " ✓" if cat is None else ""
+            rows.append([
+                InlineKeyboardButton("💊 Medicação" + med_mark, callback_data=f"task_cat:{task.id}:medicacao"),
+                InlineKeyboardButton("📅 Agendamento" + age_mark, callback_data=f"task_cat:{task.id}:agendamento"),
+                InlineKeyboardButton("🏷️ Nenhuma" + sem_mark, callback_data=f"task_cat:{task.id}:none"),
+            ])
 
         nota_label = "📝 Nota ✓" if task.notes else "📝 Nota"
         rows.append([

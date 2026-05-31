@@ -357,6 +357,10 @@ def msg_task_detail(task, subtasks=None) -> str:
     elif task.blocker_type:
         lines.append(f"\n⚠️ Travada: {_BLOCKER_LABEL.get(task.blocker_type, task.blocker_type)}")
 
+    _CAT_LABEL = {"medicacao": "💊 Medicação", "agendamento": "📅 Agendamento"}
+    if task.category and task.category in _CAT_LABEL:
+        lines.append(_CAT_LABEL[task.category])
+
     _REC_LABEL = {"daily": "🔁 Diária", "weekly": "🔁 Semanal", "monthly": "🔁 Mensal"}
     if task.recurrence and task.recurrence in _REC_LABEL:
         lines.append(_REC_LABEL[task.recurrence])

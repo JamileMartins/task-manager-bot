@@ -465,6 +465,18 @@ def set_task_couple(task_id: str | uuid.UUID, chat_id: int, make_couple: bool) -
         return task
 
 
+def set_task_category(task_id: str | uuid.UUID, category: Optional[str]) -> Optional[Task]:
+    """Define (ou remove) a categoria de uma tarefa. Valores válidos: 'medicacao', 'agendamento', None."""
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        task = session.get(Task, uid)
+        if task is None:
+            return None
+        task.category = category
+        task.last_touched_at = _now()
+        return task
+
+
 def assign_couple_task(task_id: str | uuid.UUID, chat_id: int, target: str) -> Optional[Task]:
     """Define o modo/dono de uma tarefa de casal.
 
@@ -545,6 +557,7 @@ def get_medicacoes(chat_id: int) -> tuple[list[Task], list[Task], list[Task]]:
             select(Task)
             .where(
                 Task.list_id == saude.id,
+                Task.category == "medicacao",
                 Task.recurrence == "daily",
                 Task.status == "aberta",
                 or_(Task.due_at.is_(None), Task.due_at <= today_end),
@@ -555,6 +568,7 @@ def get_medicacoes(chat_id: int) -> tuple[list[Task], list[Task], list[Task]]:
             select(Task)
             .where(
                 Task.list_id == saude.id,
+                Task.category == "medicacao",
                 Task.recurrence.like("weekly%"),
                 Task.status == "aberta",
                 Task.due_at >= today_start,
@@ -566,6 +580,7 @@ def get_medicacoes(chat_id: int) -> tuple[list[Task], list[Task], list[Task]]:
             select(Task)
             .where(
                 Task.list_id == saude.id,
+                Task.category == "medicacao",
                 Task.status == "concluida",
                 Task.completed_at >= today_start,
             )
@@ -621,6 +636,7 @@ def create_medicacao(chat_id: int, title: str, recurrence: str, med_time: str | 
             notes=med_time,
             recurrence=recurrence,
             due_at=first_due,
+            category="medicacao",
             status="aberta",
             sort_order=0,
             created_at=now,

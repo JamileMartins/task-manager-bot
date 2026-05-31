@@ -99,6 +99,8 @@ class Task(Base):
     waiting_since: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     due_alerted: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
     # Google Calendar (C6) — id do evento espelhado e quando foi sincronizado.
+    # Subcategoria dentro de uma lista (ex: 'medicacao', 'agendamento'). None = tarefa comum.
+    category: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     gcal_event_id: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
     gcal_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

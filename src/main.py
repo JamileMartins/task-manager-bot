@@ -125,6 +125,7 @@ from src.handlers.task_detail import (
     cb_sub_complete,
     cb_task_assign,
     cb_task_detail,
+    cb_task_set_category,
     cb_task_set_couple,
     cb_task_move_to,
     cb_task_reorder,
@@ -286,6 +287,7 @@ def _register_handlers(app: Application) -> None:
 
     # Detalhe e edição de tarefa
     app.add_handler(CallbackQueryHandler(cb_task_detail, pattern=r"^task_dt:"))
+    app.add_handler(CallbackQueryHandler(cb_task_set_category, pattern=r"^task_cat:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_couple, pattern=r"^task_couple:"))
     app.add_handler(CallbackQueryHandler(cb_task_assign, pattern=r"^task_assign:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_quadrant, pattern=r"^task_q:"))

@@ -23,6 +23,7 @@ _MOVE_LISTAS_KEY = "move_listas"
 _HAS_COUPLE_KEY = "detail_has_couple"
 _NOTE_TASK_KEY = "note_task_id"
 _TITLE_TASK_KEY = "title_task_id"
+_SHOW_CATEGORY_KEY = "detail_show_category"
 
 _NOTE_TEXT = 1
 _TITLE_TEXT = 2
@@ -31,6 +32,10 @@ _TITLE_TEXT = 2
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _is_saude_task(task) -> bool:
+    return bool(task.task_list and getattr(task.task_list, "slug", None) == "saude") or bool(task.category)
+
 
 async def _refresh_detail(query, task_id: uuid.UUID, context: ContextTypes.DEFAULT_TYPE) -> None:
     listas = context.user_data.get(_MOVE_LISTAS_KEY, [])
@@ -41,9 +46,14 @@ async def _refresh_detail(query, task_id: uuid.UUID, context: ContextTypes.DEFAU
     if task is None:
         await query.edit_message_text(textos.MSG_ERRO_GENERICO)
         return
+    show_category = context.user_data.get(_SHOW_CATEGORY_KEY, _is_saude_task(task))
     await query.edit_message_text(
         textos.msg_task_detail(task, subtasks),
-        reply_markup=keyboards.kb_task_detail(task, listas, subtasks, show_couple=context.user_data.get(_HAS_COUPLE_KEY, False)),
+        reply_markup=keyboards.kb_task_detail(
+            task, listas, subtasks,
+            show_couple=context.user_data.get(_HAS_COUPLE_KEY, False),
+            show_category=show_category,
+        ),
     )
 
 
@@ -78,9 +88,15 @@ async def cb_task_detail(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if task is None:
             await query.edit_message_text(textos.MSG_ERRO_GENERICO)
             return
+        show_category = _is_saude_task(task)
+        context.user_data[_SHOW_CATEGORY_KEY] = show_category
         await query.edit_message_text(
             textos.msg_task_detail(task, subtasks),
-            reply_markup=keyboards.kb_task_detail(task, listas_dicts, subtasks, show_couple=has_couple),
+            reply_markup=keyboards.kb_task_detail(
+                task, listas_dicts, subtasks,
+                show_couple=has_couple,
+                show_category=show_category,
+            ),
         )
     except Exception:
         logger.exception("Erro ao abrir detalhe da tarefa %s", task_id)
@@ -431,6 +447,20 @@ async def cb_sub_complete(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # ---------------------------------------------------------------------------
 # Editar título de tarefa (Sugestão #9)
 # ---------------------------------------------------------------------------
+
+async def cb_task_set_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    if not is_authorized(update):
+        await query.answer()
+        return
+    parts = query.data.split(":")
+    task_id = uuid.UUID(parts[1])
+    raw = parts[2]
+    category = None if raw == "none" else raw
+    await asyncio.to_thread(task_service.set_task_category, task_id, category)
+    await query.answer("💊 Medicação" if category == "medicacao" else ("📅 Agendamento" if category == "agendamento" else "🏷️ Sem categoria"))
+    await _refresh_detail(query, task_id, context)
+
 
 async def cb_task_title_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query

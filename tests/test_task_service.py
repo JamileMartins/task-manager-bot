@@ -2415,3 +2415,83 @@ def test_get_projetos_ignora_lista_vazia(svc):
 
 def test_get_projetos_usuario_inexistente_retorna_vazio(svc):
     assert task_service.get_projetos(999888) == []
+
+
+# ---------------------------------------------------------------------------
+# Categoria de tarefa (Task.category) — create_medicacao, get_medicacoes, set_task_category
+# ---------------------------------------------------------------------------
+
+def _saude_list(session, user) -> TaskList:
+    lst = TaskList(
+        user_id=user.id, name="Saúde", slug="saude", is_couple=False, sort_order=4
+    )
+    session.add(lst)
+    session.flush()
+    return lst
+
+
+def test_create_medicacao_define_category_medicacao(svc):
+    user = _user(svc)
+    task = task_service.create_medicacao(user.telegram_chat_id, "Puran T4", "daily", "08:00")
+    assert task.category == "medicacao"
+
+
+def test_get_medicacoes_exclui_tarefa_sem_categoria(svc):
+    user = _user(svc)
+    saude = _saude_list(svc, user)
+    # Medicação legítima
+    task_service.create_medicacao(user.telegram_chat_id, "Puran T4", "daily", None)
+    # Tarefa avulsa na lista Saúde (sem categoria)
+    now = datetime.now(timezone.utc)
+    svc.add(Task(
+        user_id=user.id, list_id=saude.id, title="Marcar dermatologista",
+        status="aberta", sort_order=0, created_at=now, last_touched_at=now,
+    ))
+    svc.flush()
+
+    daily, weekly, _ = task_service.get_medicacoes(user.telegram_chat_id)
+
+    titulos = [t.title for t in daily + weekly]
+    assert "Puran T4" in titulos
+    assert "Marcar dermatologista" not in titulos
+
+
+def test_get_medicacoes_exclui_tarefa_categoria_agendamento(svc):
+    user = _user(svc)
+    saude = _saude_list(svc, user)
+    now = datetime.now(timezone.utc)
+    svc.add(Task(
+        user_id=user.id, list_id=saude.id, title="Consulta ortopedista",
+        category="agendamento", recurrence="daily",
+        status="aberta", sort_order=0, created_at=now, last_touched_at=now,
+    ))
+    svc.flush()
+
+    daily, _, _ = task_service.get_medicacoes(user.telegram_chat_id)
+
+    assert not any(t.title == "Consulta ortopedista" for t in daily)
+
+
+def test_set_task_category_define_agendamento(svc):
+    user = _user(svc)
+    t = _task(svc, user, title="Marcar dermatologista")
+
+    updated = task_service.set_task_category(t.id, "agendamento")
+
+    assert updated is not None
+    assert updated.category == "agendamento"
+
+
+def test_set_task_category_remove_categoria(svc):
+    user = _user(svc)
+    task = task_service.create_medicacao(user.telegram_chat_id, "Vitamina D", "daily", None)
+
+    updated = task_service.set_task_category(task.id, None)
+
+    assert updated is not None
+    assert updated.category is None
+
+
+def test_set_task_category_tarefa_inexistente_retorna_none(svc):
+    import uuid as _uuid
+    assert task_service.set_task_category(_uuid.uuid4(), "medicacao") is None
