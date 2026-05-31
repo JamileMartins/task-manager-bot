@@ -10,7 +10,7 @@ from telegram.ext import ContextTypes
 
 from src.handlers.common import deny_unauthorized, is_authorized
 from src.handlers import notify
-from src.services import task_service
+from src.services import couple_service, task_service
 from src.utils import keyboards, textos
 
 logger = logging.getLogger(__name__)
@@ -137,10 +137,11 @@ async def _notify_if_couple(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 async def _refresh_after_complete(query, chat_id: int, completed_task_id: str) -> None:
     lists = await asyncio.to_thread(task_service.get_user_lists, chat_id)
     inbox_count = await asyncio.to_thread(task_service.get_inbox_count, chat_id)
+    couple_count = await asyncio.to_thread(task_service.get_couple_task_count, chat_id)
 
     await query.edit_message_text(
         f"{textos.msg_conclusao()}\n\n{textos.MSG_SUAS_LISTAS}",
-        reply_markup=keyboards.kb_listas(lists, inbox_count),
+        reply_markup=keyboards.kb_listas(lists, inbox_count, couple_count),
     )
 
 
@@ -155,8 +156,33 @@ async def cb_back_to_lists(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def _show_lists(query, chat_id: int) -> None:
     lists = await asyncio.to_thread(task_service.get_user_lists, chat_id)
     inbox_count = await asyncio.to_thread(task_service.get_inbox_count, chat_id)
+    couple_count = await asyncio.to_thread(task_service.get_couple_task_count, chat_id)
 
     await query.edit_message_text(
         textos.MSG_SUAS_LISTAS,
-        reply_markup=keyboards.kb_listas(lists, inbox_count),
+        reply_markup=keyboards.kb_listas(lists, inbox_count, couple_count),
     )
+
+
+async def cb_view_casal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+    try:
+        chat_id = update.effective_chat.id
+        tasks = await asyncio.to_thread(task_service.get_couple_tasks, chat_id)
+        if not tasks:
+            await query.edit_message_text(
+                textos.MSG_CASAL_VAZIA,
+                reply_markup=keyboards.kb_inbox([]),
+            )
+            return
+        names = await asyncio.to_thread(couple_service.member_names, chat_id)
+        await query.edit_message_text(
+            textos.msg_casal(tasks, names),
+            reply_markup=keyboards.kb_tasks(tasks),
+        )
+    except Exception:
+        logger.exception("Erro ao ver tarefas do casal")
+        await query.edit_message_text(textos.MSG_ERRO_GENERICO)

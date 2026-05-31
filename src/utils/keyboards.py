@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Sequence
+from typing import Optional, Sequence
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -23,7 +23,7 @@ def kb_undo_capture(task_id: uuid.UUID) -> InlineKeyboardMarkup:
 # Listas
 # ---------------------------------------------------------------------------
 
-def kb_listas(lists: list, inbox_count: int) -> InlineKeyboardMarkup:
+def kb_listas(lists: list, inbox_count: int, couple_count: Optional[int] = None) -> InlineKeyboardMarkup:
     from src.utils.textos import lista_emoji
     rows = []
     for lst in lists:
@@ -31,6 +31,10 @@ def kb_listas(lists: list, inbox_count: int) -> InlineKeyboardMarkup:
         emoji = lista_emoji(lst.slug)
         label = f"{emoji} {lst.name} — {count} {'aberta' if count == 1 else 'abertas'}"
         rows.append([InlineKeyboardButton(label, callback_data=f"view_list:{lst.id}")])
+
+    if couple_count is not None:
+        casal_label = f"💞 Casal — {couple_count} {'tarefa' if couple_count == 1 else 'tarefas'}"
+        rows.append([InlineKeyboardButton(casal_label, callback_data="view_casal")])
 
     inbox_label = f"📥 Inbox — {inbox_count} {'item' if inbox_count == 1 else 'itens'}"
     rows.append([InlineKeyboardButton(inbox_label, callback_data="view_inbox")])
