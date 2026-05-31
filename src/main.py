@@ -140,6 +140,7 @@ from src.handlers.task_detail import (
 from src.handlers.tasks import (
     cb_back_to_lists,
     cb_complete_task,
+    cb_view_casal,
     cb_view_inbox,
     cb_view_list,
     cmd_ver,
@@ -301,6 +302,7 @@ def _register_handlers(app: Application) -> None:
     # Navegação e tarefas
     app.add_handler(CallbackQueryHandler(cb_view_list, pattern=r"^view_list:"))
     app.add_handler(CallbackQueryHandler(cb_view_inbox, pattern=r"^view_inbox$"))
+    app.add_handler(CallbackQueryHandler(cb_view_casal, pattern=r"^view_casal$"))
     app.add_handler(CallbackQueryHandler(cb_complete_task, pattern=r"^complete_task:"))
     app.add_handler(CallbackQueryHandler(cb_back_to_lists, pattern=r"^back_to_lists$"))
 

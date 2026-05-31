@@ -413,6 +413,23 @@ def get_couple_tasks(chat_id: int) -> list[Task]:
         ).all())
 
 
+def get_couple_task_count(chat_id: int) -> Optional[int]:
+    """Contagem de tarefas abertas/aguardando do casal, ou None se sem casal."""
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return None
+        couple_id = _couple_id_for(session, user.id)
+        if couple_id is None:
+            return None
+        return session.scalar(
+            select(func.count(Task.id)).where(
+                Task.couple_id == couple_id,
+                Task.status.in_(["aberta", "aguardando"]),
+            )
+        ) or 0
+
+
 def has_couple(chat_id: int) -> bool:
     """True se o usuário está pareado num casal."""
     with get_session() as session:

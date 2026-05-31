@@ -223,6 +223,23 @@ def test_create_task_cria_usuario_na_primeira_vez(svc):
     assert user.name == "Novo Usuário"
 
 
+def test_create_task_in_list_cria_na_lista_informada(svc):
+    user = _user(svc)
+    lst = _list(svc, user, name="Trabalho")
+
+    task = task_service.create_task_in_list(user.telegram_chat_id, lst.id, "Enviar proposta")
+
+    assert task.title == "Enviar proposta"
+    assert task.user_id == user.id
+    assert task.list_id == lst.id
+    assert task.status == "aberta"
+
+
+def test_create_task_in_list_usuario_inexistente_gera_erro(svc):
+    with pytest.raises(ValueError, match="Usuário não encontrado"):
+        task_service.create_task_in_list(999888, uuid.uuid4(), "Sem usuário")
+
+
 # ---------------------------------------------------------------------------
 # Conclusão de tarefa
 # ---------------------------------------------------------------------------
@@ -1329,6 +1346,17 @@ def test_update_config_salva_grupo_casal(svc):
     assert cfg.couple_group_chat_id == -100123456
 
 
+def test_update_config_cria_config_quando_ausente(svc):
+    user = _user(svc)
+
+    cfg = task_service.update_config(user.telegram_chat_id, stale_days=10)
+
+    assert cfg is not None
+    assert cfg.user_id == user.id
+    assert cfg.stale_days == 10
+    assert cfg.stale_waiting_days == 14
+
+
 def test_update_config_ignora_campo_nao_permitido(svc):
     user = _user(svc)
     task_service._create_initial_lists(svc, user)
@@ -1375,6 +1403,24 @@ def test_complete_task_recorrencia_diaria_due_at_correto(svc):
     assert proxima is not None
     due = proxima.due_at.replace(tzinfo=timezone.utc) if proxima.due_at.tzinfo is None else proxima.due_at
     assert due == prazo + timedelta(days=1)
+
+
+def test_complete_task_recorrencia_semanal_ancora_no_dia_configurado(svc):
+    user = _user(svc)
+    prazo = datetime(2026, 6, 1, 9, 0, tzinfo=timezone.utc)
+    target_dow = (prazo.weekday() + 3) % 7
+    t = _task_f3(svc, user, title="Semanal com dia", due_at=prazo)
+    t.recurrence = f"weekly:{target_dow}"
+    svc.flush()
+
+    task_service.complete_task(t.id)
+
+    proxima = svc.scalar(
+        select(Task).where(Task.user_id == user.id, Task.status == "aberta")
+    )
+    assert proxima is not None
+    due = proxima.due_at.replace(tzinfo=timezone.utc) if proxima.due_at.tzinfo is None else proxima.due_at
+    assert due == prazo + timedelta(days=3)
 
 
 def test_complete_task_recorrencia_mensal_avanca_30_dias(svc):
@@ -1424,6 +1470,25 @@ def test_complete_task_recorrencia_preserva_atributos(svc):
     assert proxima.estimate_min == 30
     assert proxima.list_id == lst.id
     assert proxima.recurrence == "weekly"
+
+
+def test_complete_task_recorrente_cria_lembrete_para_proxima_ocorrencia(svc):
+    user = _user(svc)
+    prazo = datetime(2026, 6, 1, 9, 0, tzinfo=timezone.utc)
+    t = _task_f3(svc, user, title="Com lembrete", due_at=prazo)
+    t.recurrence = "daily"
+    svc.flush()
+
+    task_service.complete_task(t.id)
+
+    proxima = svc.scalar(
+        select(Task).where(Task.user_id == user.id, Task.status == "aberta")
+    )
+    assert proxima is not None
+    lembrete = svc.scalar(select(Reminder).where(Reminder.task_id == proxima.id))
+    assert lembrete is not None
+    remind = lembrete.remind_at.replace(tzinfo=timezone.utc) if lembrete.remind_at.tzinfo is None else lembrete.remind_at
+    assert remind == prazo + timedelta(days=1)
 
 
 # ---------------------------------------------------------------------------
@@ -2075,6 +2140,25 @@ def test_get_subtasks_aceita_string_uuid(svc):
     assert len(resultado) == 1
 
 
+def test_create_related_task_herda_usuario_e_lista_do_pai(svc):
+    user = _user(svc)
+    lst = _list(svc, user, name="Projeto")
+    pai = _task(svc, user, title="Pai", list_id=lst.id)
+
+    relacionada = task_service.create_related_task(pai.id, "Decidir próximo passo", quadrant=1)
+
+    assert relacionada is not None
+    assert relacionada.user_id == user.id
+    assert relacionada.list_id == lst.id
+    assert relacionada.title == "Decidir próximo passo"
+    assert relacionada.quadrant == 1
+    assert relacionada.energy == "media"
+
+
+def test_create_related_task_inexistente_retorna_none(svc):
+    assert task_service.create_related_task(uuid.uuid4(), "Sem pai") is None
+
+
 # ---------------------------------------------------------------------------
 # Energia do dia (Sugestao 1)
 # ---------------------------------------------------------------------------
@@ -2173,7 +2257,8 @@ def test_get_upcoming_tasks_nao_retorna_hoje(svc):
     user = _user(svc)
     task_service._create_initial_lists(svc, user)
     svc.flush()
-    hoje = datetime.now(timezone.utc)
+    from zoneinfo import ZoneInfo
+    hoje = datetime.now(ZoneInfo("America/Fortaleza"))
     t = _task_f3(svc, user, title="Tarefa de hoje", due_at=hoje)
 
     resultado = task_service.get_upcoming_tasks(user.telegram_chat_id, 7)

@@ -35,8 +35,9 @@ _ADD_TASK_TITLE = 3
 async def _show_lists(update_or_query, chat_id: int, *, via_message: bool = False) -> None:
     lists = await asyncio.to_thread(task_service.get_user_lists, chat_id)
     inbox_count = await asyncio.to_thread(task_service.get_inbox_count, chat_id)
+    couple_count = await asyncio.to_thread(task_service.get_couple_task_count, chat_id)
 
-    kb = keyboards.kb_listas(lists, inbox_count)
+    kb = keyboards.kb_listas(lists, inbox_count, couple_count)
 
     if via_message:
         await update_or_query.reply_text(textos.MSG_SUAS_LISTAS, reply_markup=kb)
