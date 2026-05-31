@@ -1672,6 +1672,48 @@ def test_get_couple_tasks_usuario_inexistente(svc):
 
 
 # ---------------------------------------------------------------------------
+# C3b — get_couple_task_count
+# ---------------------------------------------------------------------------
+
+def test_get_couple_task_count_retorna_contagem_correta(svc):
+    a = _user(svc, chat_id=111, name="Ana")
+    b = _user(svc, chat_id=222, name="Beto")
+    couple = _couple(svc, a, b)
+    _couple_task(svc, a, couple, title="T1")
+    _couple_task(svc, a, couple, title="T2")
+
+    assert task_service.get_couple_task_count(111) == 2
+    assert task_service.get_couple_task_count(222) == 2
+
+
+def test_get_couple_task_count_inclui_aguardando(svc):
+    a = _user(svc, chat_id=111, name="Ana")
+    couple = _couple(svc, a)
+    _couple_task(svc, a, couple, title="Aberta")
+    _couple_task(svc, a, couple, title="Aguardando", status="aguardando")
+
+    assert task_service.get_couple_task_count(111) == 2
+
+
+def test_get_couple_task_count_ignora_concluidas(svc):
+    a = _user(svc, chat_id=111, name="Ana")
+    couple = _couple(svc, a)
+    _couple_task(svc, a, couple, title="Aberta")
+    _couple_task(svc, a, couple, title="Concluída", status="concluida")
+
+    assert task_service.get_couple_task_count(111) == 1
+
+
+def test_get_couple_task_count_sem_casal_retorna_none(svc):
+    _user(svc, chat_id=111, name="Ana")
+    assert task_service.get_couple_task_count(111) is None
+
+
+def test_get_couple_task_count_usuario_inexistente_retorna_none(svc):
+    assert task_service.get_couple_task_count(999888) is None
+
+
+# ---------------------------------------------------------------------------
 # F5 — search_tasks (US-22)
 # ---------------------------------------------------------------------------
 

@@ -30,23 +30,23 @@ Se quiser evitar Postgres no início, é possível usar **SQLite** com um volume
 
 ```text
 ┌─────────────┐     webhook/polling      ┌──────────────────────┐
-│   Telegram   │ <----------------------> │   Bot (Python/PTB)    │
-│  (cliente)   │                          │  - handlers           │
-└─────────────┘                          │  - conversação        │
-                                          │  - jobs agendados     │
-                                          └─────────┬────────────┘
-                                                    │
-                            ┌───────────────────────┼───────────────────────┐
-                            │                       │                       │
-                     ┌──────▼──────┐        ┌───────▼───────┐       ┌────────▼────────┐
-                     │  Serviço    │        │  Serviço IA    │       │   Repositório    │
-                     │  de Tarefas │        │ (Claude API)   │       │  (SQLAlchemy)    │
-                     └─────────────┘        └────────────────┘       └────────┬────────┘
-                                                                              │
-                                                                       ┌──────▼──────┐
-                                                                       │ PostgreSQL  │
-                                                                       │ (Supabase)  │
-                                                                       └─────────────┘
+│   Telegram  │ <----------------------> │   Bot (Python/PTB)   │
+│  (cliente)  │                          │  - handlers          │
+└─────────────┘                          │  - conversação       │
+                                         │  - jobs agendados    │
+                                         └─────────┬────────────┘
+                                                   │
+                            ┌──────────────────────┼───────────────────────┐
+                            │                      │                       │
+                     ┌──────▼──────┐       ┌───────▼────────┐      ┌────────▼────────┐
+                     │  Serviço    │       │  Serviço IA    │      │  Repositório    │
+                     │  de Tarefas │       │ (Claude API)   │      │ (SQLAlchemy)    │
+                     └─────────────┘       └────────────────┘      └────────┬────────┘
+                                                                            │
+                                                                      ┌──────▼──────┐
+                                                                      │ PostgreSQL  │
+                                                                      │ (Supabase)  │
+                                                                      └─────────────┘
 ```
 
 ### 2.1 Camadas

@@ -75,7 +75,7 @@ Agrupam tarefas por área de vida. Personalizáveis (criar, renomear, arquivar).
 - **Trabalho** - coisas relacionadas às atividades de trabalho.
 - **Projetos** - coisas relacionadas à projeto pessoais
 - **Casa (solo)** — coisas de casa que faço sozinha
-- **Casa (casal)** — coisas de casa do casal (exportáveis para grupo)
+- **Casa (casal)** — lista pessoal de casa para tarefas solo com contexto de casal
 - **Saúde** - agendamentos médicos, exames, medicações, etc.
 - **Ideias** — captura de ideias, não necessariamente acionáveis
 
@@ -229,9 +229,12 @@ Tarefa parada raramente é "preguiça": quase sempre há um **impedimento** não
 - Em dia/horário configurado, bot lista tarefas abertas há mais de N dias sem ação e oferece, uma a uma: **Reagendar | Arquivar | Manter**.
 - Em seguida, uma seção de **esperas longas**: tarefas em status `aguardando` há mais de M dias (configurável, padrão 14). Para cada uma, com tom acolhedor ("você está esperando isto há X dias — ainda faz sentido?"), oferece: **Cobrar agora** (cria/dispara a cobrança) | **Desbloquear** (volta para aberta) | **Arquivar** (sem culpa) | **Seguir esperando** (reinicia o contador).
 
-### 6.5 Exportar casal
+### 6.5 Tarefas de casal
 
-- Usuária toca /casal → bot formata as tarefas abertas da lista "Casa (casal)" e envia ao grupo configurado.
+- Tarefas do casal são identificadas por `couple_id` (não por lista) e visíveis pelos dois membros do par.
+- `/listas` exibe uma entrada **"💞 Casal — N tarefas"** (contando `aberta` + `aguardando`) quando o usuário está pareado; ausente para quem não tem par.
+- Tocar no botão "💞 Casal" abre a lista inline; `/casal` faz o mesmo via comando.
+- O grupo de casal configurado em `/config` pode receber o resumo exportado, mas não comanda o bot.
 
 ### 6.6 Desbloquear impedimento
 
@@ -258,7 +261,7 @@ Tarefa parada raramente é "preguiça": quase sempre há um **impedimento** não
 | /ver `<lista>` | Ver tarefas de uma lista |
 | /inbox | Ver itens não triados |
 | /hoje | Focos do dia sob demanda |
-| /casal | Exportar tarefas de casal para o grupo |
+| /casal | Ver tarefas compartilhadas do casal (também acessível via /listas) |
 | /tudo | Ver todas as tarefas abertas agrupadas por lista |
 | /medicacoes | Checklist de medicações recorrentes (diárias e semanais) |
 | /buscar `<termo>` | Buscar tarefas |

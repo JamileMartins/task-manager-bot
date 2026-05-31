@@ -216,15 +216,17 @@
 
 ## Épico 6 — Casal e configuração
 
-### US-19 — Exportar tarefas de casal para grupo
+### US-19 — Ver e compartilhar tarefas de casal
 
-**Como** a usuária, **quero** enviar a lista de casa-casal a um grupo, **para** combinar com meu parceiro.
+**Como** a usuária, **quero** ver as tarefas do casal e compartilhá-las com meu par, **para** combinar o que precisa ser feito em casa.
 
 - Refs: RF16
 - **CA:**
-  - /casal formata as tarefas abertas da lista de casal.
-  - Envia a mensagem ao grupo configurado em /config.
-  - Se o grupo não estiver configurado, o bot orienta como configurar.
+  - Tarefas de casal são identificadas por `couple_id` e visíveis pelos dois membros.
+  - `/listas` exibe entrada "💞 Casal — N tarefas" para usuários pareados; clicar abre a lista inline.
+  - `/casal` exibe as mesmas tarefas via comando direto.
+  - Cada tarefa pode ser: **minha vez**, **vez do par**, **sem dono** ou **conjunta**.
+  - O grupo de casal (configurado em /config) pode receber exportação, mas não comanda o bot.
 - Prioridade: Should · Fase: F5 · **Status: ✅ Feito**
 
 ### US-20 — Configurações
