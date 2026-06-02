@@ -1766,19 +1766,23 @@ def get_progresso(chat_id: int) -> list[ProjetoInfo]:
             )
 
             if lst.is_couple and couple_id is not None:
-                couple_base = (base, Task.couple_id.isnot(None),
-                               Task.status.notin_(["concluida", "arquivada"]),
-                               Task.parent_task_id.is_(None))
+                # Tarefas do casal NÃO são filtradas por list_id:
+                # podem estar em qualquer lista ou na inbox.
+                couple_base = (
+                    Task.couple_id == couple_id,
+                    Task.status.notin_(["concluida", "arquivada"]),
+                    Task.parent_task_id.is_(None),
+                )
                 info.couple_mine = session.scalar(
                     select(func.count(Task.id)).where(
                         *couple_base, Task.assigned_to == user.id
                     )
                 ) or 0
-                info.couple_partner = session.scalar(
+                info.couple_partner = (session.scalar(
                     select(func.count(Task.id)).where(
                         *couple_base, Task.assigned_to == partner_user_id
                     )
-                ) or 0 if partner_user_id else 0
+                ) or 0) if partner_user_id else 0
                 info.couple_joint = session.scalar(
                     select(func.count(Task.id)).where(
                         *couple_base, Task.couple_joint.is_(True)

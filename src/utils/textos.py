@@ -3,7 +3,12 @@ from __future__ import annotations
 
 import random
 
-from src.version import __release_date__, __version__
+import pytz as _pytz
+
+from src.version import __release_dt__, __version__
+
+_BRT = _pytz.timezone("America/Fortaleza")
+__release_date__ = __release_dt__.astimezone(_BRT).strftime("%Y-%m-%d %H:%M") + " BRT"
 
 
 def _pick(*variants: str) -> str:
