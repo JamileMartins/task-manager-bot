@@ -40,7 +40,7 @@ Não implemente nada das fases F2 a F5 ainda. Quando a F1 estiver pronta e testa
 ```text
 A Fase F1 está pronta e testada. Agora implemente a Fase F2 (IA + classificação), histórias US-02, US-03 e US-04. Leia docs/04_PROMPT_CLASSIFICACAO_IA.md por completo — ele tem o system prompt de produção, regras de cada campo, exemplos few-shot, parsing seguro e pós-processamento.
 
-Entregue: o cliente de IA em services/ai_service.py (usando ANTHROPIC_API_KEY, temperatura baixa, uma chamada por brain dump); separação de múltiplas tarefas e classificação; o resumo aprovável com botões "Aprovar tudo" e "Ajustar"; o fluxo de Inbox para baixa confiança; e o fallback obrigatório: se a IA falhar ou o JSON vier inválido, salvar o texto como uma tarefa na Inbox sem quebrar (RNF08). Inclua testes para o parser de JSON, inclusive entradas malformadas. Não avance para F3.
+Entregue: o cliente de IA em services/ai_service.py (usando GEMINI_API_KEY/GEMINI_MODEL, temperatura baixa, uma chamada por brain dump); separação de múltiplas tarefas e classificação; o resumo aprovável com botões "Aprovar tudo" e "Ajustar"; o fluxo de Inbox para baixa confiança; e o fallback obrigatório: se a IA falhar ou o JSON vier inválido, salvar o texto como uma tarefa na Inbox sem quebrar (RNF08). Inclua testes para o parser de JSON, inclusive entradas malformadas. Não avance para F3.
 ```
 
 ### Fase F3 — Priorização
@@ -68,4 +68,4 @@ Implemente a Fase F5, histórias US-19, US-20 e US-22. Inclua: comando /casal qu
 - **Uma fase por vez.** Valide os critérios de aceitação antes de avançar — evita acumular bugs e mantém o escopo sob controle (útil para revisar sem sobrecarga).
 - **Commit ao fim de cada fase**, conferindo antes que nenhum segredo entrou (`git status` e revisar o diff).
 - Se o Claude Code quiser fazer tudo de uma vez, peça para voltar e respeitar o faseamento.
-- Configure as contas (BotFather, Supabase, Anthropic) antes da F1 — veja a seção de pré-requisitos do README.md.
+- Configure as contas (BotFather, Supabase, Google AI Studio) antes da F1 — veja a seção de pré-requisitos do README.md.

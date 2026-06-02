@@ -5,7 +5,7 @@
 
 ## O que é este projeto
 
-Bot de Telegram chamado **Task Manager**: um "segundo cérebro" de tarefas, mono-usuário, projetado para reduzir atrito e apoiar funções executivas de uma pessoa com TDAH. Captura por texto livre (brain dump), classificação assistida por IA (Google Gemini API), priorização via Matriz de Eisenhower, sugestão ativa de "o que fazer agora", e rituais de revisão (diário e semanal).
+Bot de Telegram chamado **Task Manager**: um "segundo cérebro" de tarefas em instância privada com allowlist, projetado para reduzir atrito e apoiar funções executivas de uma pessoa com TDAH. Captura por texto livre/voz (brain dump), classificação assistida por IA (Google Gemini API), priorização via Matriz de Eisenhower, sugestão ativa de "o que fazer agora", rituais de revisão (diário e semanal) e modo casal com isolamento de tarefas pessoais.
 
 ## Princípios de design (não violar)
 
@@ -36,7 +36,7 @@ Bot de Telegram chamado **Task Manager**: um "segundo cérebro" de tarefas, mono
 ## Ordem de implementação (fases)
 
 - **F1 — Núcleo**: modelos + migrações; captura texto livre → Inbox; listar; concluir; restrição de chat_id. (US-01, US-05, US-06, US-13, US-21)
-- **F2 — IA**: brain dump multi-tarefa; classificação Claude; aprovação em bloco; triagem Inbox. (US-02, US-03, US-04)
+- **F2 — IA**: brain dump multi-tarefa; classificação Gemini; aprovação em bloco; triagem Inbox. (US-02, US-03, US-04)
 - **F3 — Priorização**: quadrante assistido; editar atributos; prazo/tempo/energia; `/agora`. (US-07 a US-12)
 - **F4 — Rituais**: resumo diário; revisão semanal; lembretes; recorrência. (US-14 a US-18)
 - **F5 — Casal + polimento**: exportar casal p/ grupo; `/config`; busca; refino de tom. (US-19, US-20, US-22)

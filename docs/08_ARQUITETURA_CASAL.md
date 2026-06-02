@@ -1,17 +1,17 @@
 # Arquitetura — Modo Casal e Multiusuário
 
-> Documento de arquitetura para a evolução do bot de mono-usuário para uso por
-> um casal (dois usuários), com tarefas compartilhadas, autenticação por
-> convite e preparação para sincronização futura com Google Calendar.
+> Documento de arquitetura do modo casal (dois usuários), com tarefas compartilhadas, autenticação por
+> convite e fundação para sincronização opcional com Google Calendar.
 >
-> Status: proposta (pré-implementação). Complementa `01_PRD.md` §6 e
+> Status: implementado em base, com Google Calendar opcional em fundação. Complementa `01_PRD.md` §6 e
 > `02_ESPECIFICACAO_TECNICA.md`.
 
 ---
 
 ## 1. Contexto e diagnóstico
 
-O protótipo atual é mono-usuário, mas o **banco de dados já é multiusuário**.
+O bot começou mono-usuário, mas a implementação atual já usa allowlist e banco
+multiusuário.
 O que prende o sistema a uma pessoa é apenas a *casca* de autorização, não o
 modelo de dados nem a lógica de domínio.
 
@@ -207,7 +207,12 @@ de chat_ids registrados**:
 
 ---
 
-## 6. Futuro: sincronização com Google Calendar
+## 6. Sincronização com Google Calendar
+
+Status em 2026-06-02: o motor de sincronização mão única (`gcal_service.py`) e
+o modelo de dados já existem e são testados. A ativação ao vivo ainda depende de
+cliente real, OAuth e endpoint HTTPS de callback; por padrão o serviço é no-op
+seguro quando as credenciais/client factory não estão configurados.
 
 Não é um problema de arquitetura — a base proposta (backend único, entidade
 casal, `due_at` já timezone-aware) é compatível e não exige retrabalho. Mas é o
@@ -256,7 +261,8 @@ decisão pode ficar para depois, mas o modelo não trava.
 Só tarefas com `due_at` viram evento — o que já bate com o modelo atual.
 Quadrante, energia e estimativa não mapeiam para o calendário.
 
-> Observado em `CLAUDE.md`: integração com Google Calendar está **fora do MVP**.
+> A integração Google Calendar ao vivo segue opcional; a fundação está pronta
+> para ativação conforme `docs/10_ATIVACAO_GOOGLE_CALENDAR.md`.
 > Esta seção é planejamento arquitetural para não fechar portas, não escopo
 > imediato.
 
@@ -280,8 +286,8 @@ Seguindo a convenção de fases do `CLAUDE.md`:
   concluiu, mudou prazo) via arranjo B.1. *Critério: ação de A chega no bot de B.*
 - **C5 — Polimento de tom de casal:** `assigned_to` ("de quem é a vez"), tom
   acolhedor nas notificações, respeitar pause/horário de cada um.
-- **C6 (futuro) — Google Calendar:** endpoint OAuth; bot → Calendar mão única;
-  depois mão dupla com sync token (ver §6).
+- **C6 — Google Calendar:** motor bot → Calendar mão única implementado;
+  endpoint OAuth/cliente real ficam para ativação quando necessário.
 
 ---
 

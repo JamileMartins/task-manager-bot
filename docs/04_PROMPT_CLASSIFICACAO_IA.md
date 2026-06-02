@@ -1,6 +1,6 @@
 # Prompt de Classificação da IA — Bot "Task Manager"
 
-> Versão 1.0 — companion da `02_ESPECIFICACAO_TECNICA.md` (§4)
+> Versão 1.20.1 — companion da `02_ESPECIFICACAO_TECNICA.md` (§4)
 > Este arquivo é a especificação completa do serviço de classificação do brain dump.
 > O texto entre as marcações é para ser usado quase literalmente no código (com substituição das variáveis `{...}`).
 
@@ -8,7 +8,7 @@
 
 ## 1. Visão geral do funcionamento
 
-O serviço recebe um texto livre (uma ou várias tarefas) e devolve **somente** um JSON estruturado. Uma única chamada por brain dump. O modelo recomendado é o definido em `ANTHROPIC_MODEL`. A temperatura deve ser **baixa** (0–0.3) para classificação consistente.
+O serviço recebe um texto livre (uma ou várias tarefas) e devolve **somente** um JSON estruturado. Uma única chamada por brain dump. O modelo recomendado é o definido em `GEMINI_MODEL` (padrão atual: `gemini-2.5-flash`). A temperatura deve ser **baixa** (0–0.3) para classificação consistente.
 
 Fluxo:
 
@@ -42,9 +42,10 @@ CONTEXTO ATUAL
 - Listas disponíveis do usuário: {listas}
 
 O QUE FAZER
-1. Separe o texto em tarefas atômicas. Uma frase pode conter várias tarefas (separadas por vírgula, "e", quebras de linha, ponto). Cada ação independente é uma tarefa.
-2. Não invente tarefas que não estão no texto. Não juncte tarefas distintas em uma só.
-3. Reescreva o título de forma curta, clara e no infinitivo ou imperativo (ex.: "Ligar para o dentista"), preservando nomes próprios e detalhes essenciais.
+1. Separe o texto em tarefas atômicas. Cada ação independente vira uma tarefa separada. Itens separados por vírgula, ponto ou "e" (quando ligam ações distintas) são tarefas diferentes.
+2. Verbo implícito: quando um verbo no início se aplica a uma lista de itens, repita-o no título de cada item. Ex.: "Pagar C6, Nubank, energia" → "Pagar C6", "Pagar Nubank", "Pagar Energia".
+3. Não agrupe tarefas distintas em uma só, mesmo que pertençam ao mesmo tema. Não invente tarefas que não estão no texto.
+4. Reescreva o título de forma curta, clara e no infinitivo ou imperativo (ex.: "Ligar para o dentista"), preservando nomes próprios e detalhes essenciais.
 
 PARA CADA TAREFA, PREENCHA
 - titulo (string): título curto e acionável.
@@ -99,7 +100,7 @@ Texto para classificar:
 
 ## 5. Exemplos few-shot (calibração)
 
-Inclua 2–3 destes exemplos como pares user/assistant antes da mensagem real, para fixar o formato e o estilo. Eles refletem o contexto de vida da usuária (docência no IFCE, casa, saúde, ideias).
+Inclua exemplos few-shot como pares user/model antes da mensagem real, para fixar o formato e o estilo. A implementação atual usa quatro exemplos, incluindo brain dump misto, tarefa vaga, tarefas domésticas/desenvolvimento e listas com verbo implícito.
 
 ### Exemplo A — brain dump misto
 
@@ -188,7 +189,7 @@ def parse_resposta(texto_resposta: str, texto_original: str) -> list[dict]:
 Aplicadas após o parsing, no serviço (não na IA):
 
 - **Confiança baixa** (`confianca < 0.6`) **ou** `lista_sugerida` nula → tarefa vai para a **Inbox** (`list_id = null`), preservando os demais campos sugeridos.
-- **Lista inexistente**: se `lista_sugerida` não casar com nenhuma lista ativa (case-insensitive, ignorando acentos), tratar como nula → Inbox.
+- **Lista inexistente**: se `lista_sugerida` não casar exatamente com uma lista ativa, tratar como nula → Inbox.
 - **Impedimento externo** (`impedimento_externo = true`) → criar tarefa já em `status = 'aguardando'` e gravar `waiting_since = now()`.
 - **Próximo passo**: se `proximo_passo` vier preenchido, guardar em `tasks.next_step`. A criação da subtarefa vinculada acontece quando a usuária aceita ("Começar por aqui"), não automaticamente.
 - **Prazo**: validar ISO 8601; se inválido, descartar (null) em vez de quebrar.
@@ -221,6 +222,6 @@ Saída esperada: uma frase curta, ex.: `Abrir o Moodle e clicar em "Lançar nota
 
 - Uma chamada por brain dump; não chamar por tarefa.
 - Temperatura baixa (0–0.3).
-- Limitar `max_tokens` ao suficiente para o JSON (ex.: 1024–2048 conforme tamanho típico do dump).
-- Os exemplos few-shot podem ser reduzidos a 2 em produção para economizar tokens, mantendo o Exemplo A (mais completo).
+- Limitar `max_output_tokens` ao suficiente para o JSON (a implementação atual usa 4096 para dumps maiores).
+- Os exemplos few-shot podem ser reduzidos em produção para economizar tokens, mantendo pelo menos o Exemplo A (mais completo) e o exemplo de verbo implícito.
 - Em caso de erro/timeout da API: salvar tudo como uma tarefa na Inbox e avisar a usuária de forma leve ("Salvei na sua caixa de entrada para organizar depois").

@@ -1,11 +1,25 @@
 # Plano de Implementação — Modo Casal e Multiusuário
 
-> Plano executável para evoluir o bot de mono-usuário para uso por um casal.
+> Plano executável usado para evoluir o bot privado para uso por um casal.
 > Complementa `08_ARQUITETURA_CASAL.md` (decisões de arquitetura) com
 > **requisitos**, **tasks concretas por arquivo** e **critérios de aceitação**.
 >
-> Status: pronto para implementar. Ordem: C1 → C6, uma fase por vez (convenção
-> do `CLAUDE.md`). Cada fase termina com testes verdes e critérios atendidos.
+> Status em 2026-06-02: C1-C5 implementadas no código e cobertas por testes
+> principais; C6 tem o motor de sincronização Google Calendar implementado e
+> testado, mas a ativação ao vivo (OAuth, cliente real e callback HTTPS) continua
+> opcional/desativada por padrão. Este arquivo fica como registro do plano e
+> checklist de manutenção, não como backlog inteiramente pendente.
+
+## 0. Estado atual por fase
+
+| Fase | Status | Evidência no código |
+| --- | --- | --- |
+| C1 — Multiusuário base | Implementada | `ALLOWED_CHAT_IDS`, jobs por usuário em `rituals.setup_jobs`, testes em `tests/test_multiuser.py` |
+| C2 — Pareamento | Implementada | `Couple`, `CoupleMember`, `Invite`, `couple_service.py`, `handlers/couple.py`, migration `0004` |
+| C3 — Tarefas compartilhadas | Implementada | `Task.couple_id`, filtro de visibilidade, `/casal` real, testes em `test_couple_tasks.py` |
+| C4 — Notificações/multi-bot | Implementada | `BOT_TOKENS`, múltiplos `Application`, `handlers/notify.py`, testes em `test_notify.py` |
+| C5 — Polimento casal | Implementada em base | `assigned_to`, `couple_joint`, breakdown em `/progresso`; deduplicação/UX devem seguir monitoradas |
+| C6 — Google Calendar | Fundação implementada | `gcal_service.py`, migration `0006`, `tests/test_gcal_service.py`; ativação em `docs/10_ATIVACAO_GOOGLE_CALENDAR.md` |
 
 ---
 
@@ -270,16 +284,16 @@ o silêncio de cada um.
 
 ---
 
-## 8. Fase C6 — Google Calendar (futuro)
+## 8. Fase C6 — Google Calendar (fundação implementada; ativação opcional)
 
 Detalhe arquitetural em `08_ARQUITETURA_CASAL.md` §6. Resumo das tasks:
 
 - [ ] **Endpoint OAuth:** subir um servidor web mínimo (aiohttp/FastAPI) para o
   callback — o bot hoje é long-polling sem web server.
-- [ ] **Modelo:** `users.google_refresh_token` (criptografado),
+- [x] **Modelo:** `users.google_refresh_token` (armazenado sem criptografia de campo no MVP),
   `users.google_calendar_id`, `couples.gcal_calendar_id`, `tasks.gcal_event_id`,
   `tasks.gcal_synced_at`.
-- [ ] **Mão única (primeiro):** tarefa com `due_at` → cria/atualiza evento.
+- [x] **Motor mão única (primeiro):** tarefa com `due_at` → cria/atualiza evento.
   Decidir destino de tarefa de casal (calendário pessoal de cada um vs.
   calendário compartilhado do casal).
 - [ ] **Mão dupla (depois):** webhooks/push ou polling com sync token;
@@ -324,4 +338,4 @@ estável. Cada fase só é "pronta" quando:
 1. Testes unitários da fase passam (`pytest`).
 2. Critério de aceitação da fase verificado manualmente com dois chats de teste.
 3. Migration (se houver) aplica e reverte limpa em banco de teste.
-4. Nenhuma regressão no fluxo mono-usuário existente.
+4. Nenhuma regressão no fluxo individual existente.

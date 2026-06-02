@@ -1,9 +1,9 @@
 # PRD — Bot de Tarefas "Task Manager" (Telegram)
 
 > Documento de Requisitos do Produto (Product Requirements Document)
-> Versão 1.0 — MVP
+> Versão 1.20.1 — atualizado conforme implementação atual
 > Autoria: especificação técnica para desenvolvimento via Claude Code
-> Sistema mono-usuário (bot particular).
+> Instância privada com allowlist; suporta modo casal com isolamento de tarefas pessoais.
 
 ---
 
@@ -31,7 +31,7 @@ Um bot de Telegram que:
 - Aplica a Matriz de Eisenhower de forma assistida (a IA sugere o quadrante; o usuário confirma com um toque).
 - Sugere ativamente "o que fazer agora" com base em tempo disponível e energia.
 - Mantém rituais de revisão (resumo diário matinal e revisão semanal anti-acúmulo).
-- Exporta as tarefas de "casal" para um grupo do Telegram.
+- Compartilha tarefas de casal reais entre dois usuários pareados, com atribuição, notificações e isolamento das tarefas pessoais.
 
 ### 1.3 Objetivos do MVP
 
@@ -45,12 +45,12 @@ Um bot de Telegram que:
 
 ### 1.4 Fora de escopo (MVP)
 
-- Multi-usuário / colaboração real (sistema é mono-usuário).
+- Serviço público multi-tenant aberto. A implementação atual é uma instância privada com allowlist e modo casal.
 - Lembretes por geolocalização.
 - Atributo de "local" nas tarefas.
-- Integração com calendários externos (Google Calendar etc.) — previsto para fase futura.
+- Integração Google Calendar ao vivo completa. O motor de sincronização mão única existe como fundação, mas OAuth/cliente real/callback ficam desativados por padrão.
 - Aplicativo web/mobile próprio (o Telegram é a interface).
-- Anexos de arquivos/áudio com transcrição (fase futura).
+- Anexos gerais de arquivos. Áudio/voz já é transcrito via Gemini.
 
 ---
 
@@ -184,6 +184,10 @@ Tarefa parada raramente é "preguiça": quase sempre há um **impedimento** não
 | RF31 | A tela de uma lista tem botão "➕ Adicionar" que cria tarefa naquela lista diretamente, sem passar pela classificação IA. | Must |
 | RF32 | Comando `/tudo` exibe todas as tarefas abertas agrupadas por lista, em uma única mensagem. | Should |
 | RF33 | Comando `/medicacoes` exibe tarefas recorrentes (diárias e semanais) da lista Saúde com botões de conclusão rápida, e oferece fluxo guiado para criar nova medicação com recorrência. | Should |
+| RF34 | O bot aceita captura por voz/áudio, transcreve via Gemini e reaproveita o fluxo de brain dump. | Should |
+| RF35 | O usuário pode pausar e retomar notificações automáticas por período configurável. | Should |
+| RF36 | O usuário pode visualizar cadeias de dependência entre tarefas em `/ordem`. | Should |
+| RF37 | O usuário pode consultar progresso por lista e breakdown do casal em `/progresso [dias]`. | Should |
 
 ---
 
@@ -200,7 +204,7 @@ Tarefa parada raramente é "preguiça": quase sempre há um **impedimento** não
 | RNF07 | **Custo baixo**: uso de camadas gratuitas/baratas (Supabase free, Railway/Fly hobby). |
 | RNF08 | **Resiliência da IA**: se a Google Gemini API falhar, a tarefa ainda é salva na Inbox sem classificação. |
 | RNF09 | **Tom de voz**: mensagens acolhedoras, sem culpabilizar por acúmulo (relevante p/ TDAH). |
-| RNF10 | **Restrição de acesso**: o bot responde apenas ao chat_id autorizado da usuária. |
+| RNF10 | **Restrição de acesso**: o bot responde apenas aos chats configurados em `AUTHORIZED_CHAT_ID`/`ALLOWED_CHAT_IDS`. |
 
 ---
 
@@ -261,9 +265,21 @@ Tarefa parada raramente é "preguiça": quase sempre há um **impedimento** não
 | /ver `<lista>` | Ver tarefas de uma lista |
 | /inbox | Ver itens não triados |
 | /hoje | Focos do dia sob demanda |
+| /amanha | Tarefas com prazo amanhã |
+| /proximos `[N]` | Agenda dos próximos N dias |
 | /casal | Ver tarefas compartilhadas do casal (também acessível via /listas) |
+| /casal_convidar | Gerar código de pareamento de casal |
+| /casal_entrar `<código>` | Entrar no casal usando código |
+| /casal_status | Ver status do pareamento |
 | /tudo | Ver todas as tarefas abertas agrupadas por lista |
+| /exportar | Exportar tarefas abertas em texto copiável |
 | /medicacoes | Checklist de medicações recorrentes (diárias e semanais) |
+| /foco `[trabalho] [descanso]` | Sessão de foco/Pomodoro |
+| /parar_foco | Encerrar sessão de foco ativa |
+| /ordem | Cadeias de dependência em ordem de execução |
+| /progresso `[dias]` | Progresso por lista e casal |
+| /pausar `[dias]` | Silenciar jobs automáticos temporariamente |
+| /retomar | Reativar jobs automáticos |
 | /buscar `<termo>` | Buscar tarefas |
 | /config | Configurar horários, fuso, grupo de casal |
 | /ajuda | Lista de comandos |

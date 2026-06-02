@@ -7,6 +7,70 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não lançado]
 
+## [1.20.1] — 2026-06-02 — Ajustes do /progresso de casal
+
+### Corrigido
+
+- `/progresso` agora exibe a seção de casal mesmo quando não há listas pessoais com atividade.
+- Breakdown de casal usa o primeiro nome dos dois membros, com contagens por "minhas", parceiro, conjuntas e sem dono.
+- `/progresso [dias]` aceita janela customizada e limita valores muito altos.
+
+## [1.20.0] — 2026-06-02 — Datas futuras e tooltips
+
+### Adicionado
+
+- Presets de prazo futuro e opção de digitar data customizada no detalhe da tarefa.
+- Tooltips/textos auxiliares nos controles de edição para reduzir ambiguidade.
+
+### Corrigido
+
+- Movimento de tarefa trata duplicata de título no destino e melhora mensagens de erro em `BadRequest`.
+- Stats de casal em `/progresso` usam `couple_id`, não `list_id`.
+
+## [1.19.0] — 2026-06-02 — /progresso
+
+### Adicionado
+
+- **`/progresso`** substitui `/projetos` como visão de progresso por lista.
+- Todas as listas ativas entram no relatório, com período explícito e breakdown de casal.
+- `/projetos` permanece como alias legado.
+
+### Corrigido
+
+- Horário BRT no `/ajuda`.
+- `/casal` registrado no menu de comandos.
+
+## [1.18.0] — 2026-06-02 — /ordem
+
+### Adicionado
+
+- **`/ordem`** exibe cadeias de dependência em ordem de execução.
+- Cadeias mostram tarefas prontas e bloqueadas com botões clicáveis e detecção de ciclos no serviço.
+
+## [1.17.0] — 2026-06-02 — Dependência entre tarefas
+
+### Adicionado
+
+- Novo impedimento por tarefa bloqueadora: uma tarefa pode ficar `aguardando` por depender de outra.
+- Campo `tasks.blocked_by_task_id` e migration `0009`.
+- Ao concluir uma tarefa bloqueadora, dependentes são destravadas automaticamente.
+- Detalhe da tarefa mostra "bloqueada por" e "desbloqueia".
+- Nota livre no fluxo de impedimento e entrada pelo `/agora`.
+
+## [1.16.0] — 2026-06-02 — Saúde e classificação
+
+### Adicionado
+
+- `tasks.category` separa medicações de agendamentos na lista Saúde.
+- Backfill de medicações existentes via migration `0008`.
+
+### Melhorado
+
+- Separação de tarefas no brain dump, incluindo listas com verbo implícito.
+- Robustez de transcrição de áudio via Gemini Files API.
+- Medicações recorrentes usam horários/dias corretos e evitam acúmulo entre dias.
+- `/amanha` inclui recorrentes ainda abertas hoje.
+
 ## [1.15.0] — 2026-05-26 — /proximos, /pausar, /projetos e streak semanal
 
 ### Adicionado

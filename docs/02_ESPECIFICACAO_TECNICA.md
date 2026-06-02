@@ -1,6 +1,6 @@
 # Especificação Técnica — Bot "Task Manager"
 
-> Versão 1.0 — MVP
+> Versão 1.20.1 — documentação sincronizada com o código em 2026-06-02
 > Companion do `01_PRD.md`
 
 ---
@@ -13,7 +13,7 @@
 | Lib Telegram | **python-telegram-bot v21+** (async) | Padrão de mercado, suporte a botões inline, jobs agendados |
 | Banco de dados | **PostgreSQL gerenciado (Supabase)** | Free tier generoso, backup automático, acesso de qualquer lugar, sem administrar servidor |
 | ORM | **SQLAlchemy 2.x + Alembic** | Migrações versionadas, modelos limpos |
-| IA | **Google Gemini API** (`google-genai`, modelo `gemini-2.5-flash`) | Interpretação de brain dump e classificação; substituiu Claude API na implementação |
+| IA | **Google Gemini API** (`google-genai`, modelo `gemini-2.5-flash`) | Interpretação de brain dump, classificação e transcrição de áudio |
 | Agendamento | **APScheduler** (ou JobQueue do PTB) | Resumo diário, revisão semanal, lembretes |
 | Hospedagem | **Railway** ou **Fly.io** (hobby) | Deploy via Git, 24/7, custo baixo/zero inicial |
 | Config/segredos | **Variáveis de ambiente** (.env local, secrets na nuvem) | Não versionar tokens |
@@ -40,7 +40,7 @@ Se quiser evitar Postgres no início, é possível usar **SQLite** com um volume
                             │                      │                       │
                      ┌──────▼──────┐       ┌───────▼────────┐      ┌────────▼────────┐
                      │  Serviço    │       │  Serviço IA    │      │  Repositório    │
-                     │  de Tarefas │       │ (Claude API)   │      │ (SQLAlchemy)    │
+                     │  de Tarefas │       │ (Gemini API)   │      │ (SQLAlchemy)    │
                      └─────────────┘       └────────────────┘      └────────┬────────┘
                                                                             │
                                                                       ┌──────▼──────┐
@@ -54,7 +54,7 @@ Se quiser evitar Postgres no início, é possível usar **SQLite** com um volume
 - **Handlers (apresentação)**: recebem updates do Telegram, montam botões inline, despacham para serviços.
 - **Serviços (domínio)**: regras de negócio — captura, classificação, seleção "o que faço agora", rituais.
 - **Repositório (dados)**: acesso ao banco via SQLAlchemy.
-- **Cliente IA**: encapsula chamadas ao Claude, com prompt e parsing robusto + fallback.
+- **Cliente IA**: encapsula chamadas ao Gemini, com prompt, few-shots, parsing robusto, transcrição de áudio e fallback.
 
 ### 2.2 Polling vs Webhook
 
@@ -73,6 +73,9 @@ User (1) ───< (N) Task
 List (1) ───< (N) Task
 Task (1) ───< (N) Reminder
 Config (1 por User)
+Couple (1) ───< (N) CoupleMember >─── (1) User
+Couple (1) ───< (N) Task
+Couple (1) ───< (N) Invite
 ```
 
 ### 3.2 Tabelas
@@ -86,6 +89,8 @@ Config (1 por User)
 | name | TEXT | |
 | timezone | TEXT | ex. "America/Fortaleza" |
 | created_at | TIMESTAMPTZ | |
+| google_refresh_token | TEXT nullable | OAuth Google Calendar, opcional |
+| google_calendar_id | TEXT nullable | calendário pessoal, opcional |
 
 #### lists
 
@@ -96,6 +101,7 @@ Config (1 por User)
 | name | TEXT | ex. "Trabalho" |
 | slug | TEXT | normalizado p/ comandos |
 | is_couple | BOOLEAN | marca a lista exportável p/ grupo |
+| couple_id | UUID FK nullable | legado/escopo de lista compartilhada |
 | archived | BOOLEAN | default false |
 | sort_order | INT | |
 
@@ -106,6 +112,10 @@ Config (1 por User)
 | id | UUID PK | |
 | user_id | UUID FK | |
 | list_id | UUID FK nullable | null = Inbox |
+| couple_id | UUID FK nullable | não-nulo = tarefa compartilhada do casal |
+| created_by | UUID FK nullable | usuário que criou a tarefa de casal |
+| assigned_to | UUID FK nullable | dono da vez numa tarefa de casal |
+| couple_joint | BOOLEAN nullable | true = tarefa conjunta |
 | title | TEXT | obrigatório |
 | notes | TEXT nullable | |
 | quadrant | SMALLINT nullable | 1–4 (Eisenhower); null = não classificado |
@@ -119,7 +129,12 @@ Config (1 por User)
 | blocker_is_external | BOOLEAN nullable | true = externo (espera+gatilho); false = interno (resolver agora) |
 | next_step | TEXT nullable | menor próximo passo sugerido pela IA |
 | parent_task_id | UUID FK nullable | vínculo de subtarefa (primeiro passo / obter recurso) |
+| blocked_by_task_id | UUID FK nullable | dependência explícita de outra tarefa |
 | waiting_since | TIMESTAMPTZ nullable | quando entrou em "aguardando"; alimenta a revisão de esperas longas |
+| due_alerted | BOOLEAN nullable | evita repetir alerta de prazo vencido |
+| category | TEXT nullable | subcategoria, ex. `medicacao` ou `agendamento` |
+| gcal_event_id | TEXT nullable | evento espelhado no Google Calendar |
+| gcal_synced_at | TIMESTAMPTZ nullable | última sincronização com Calendar |
 | sort_order | INT | ordenação manual na lista |
 | created_at | TIMESTAMPTZ | |
 | completed_at | TIMESTAMPTZ nullable | |
@@ -145,6 +160,37 @@ Config (1 por User)
 | couple_group_chat_id | BIGINT nullable | grupo p/ exportar casal |
 | stale_days | INT | default 7 (parada há N dias) |
 | stale_waiting_days | INT | default 14 (espera longa: aguardando há M dias) |
+| energia_do_dia | TEXT nullable | energia escolhida no resumo diário |
+| energia_do_dia_data | DATE nullable | data da energia escolhida |
+| paused_until | TIMESTAMPTZ nullable | pausa temporária dos jobs automáticos |
+
+#### couples
+
+| Campo | Tipo | Notas |
+| --- | --- | --- |
+| id | UUID PK | |
+| created_at | TIMESTAMPTZ | |
+| gcal_calendar_id | TEXT nullable | calendário compartilhado opcional |
+
+#### couple_members
+
+| Campo | Tipo | Notas |
+| --- | --- | --- |
+| couple_id | UUID FK PK | |
+| user_id | UUID FK PK | |
+| role | TEXT | default `member` |
+| joined_at | TIMESTAMPTZ | |
+
+#### invites
+
+| Campo | Tipo | Notas |
+| --- | --- | --- |
+| code | TEXT PK | código curto de pareamento |
+| couple_id | UUID FK | casal criado/reaproveitado |
+| created_by | UUID FK | criador do convite |
+| created_at | TIMESTAMPTZ | |
+| expires_at | TIMESTAMPTZ | convite expira em 24h |
+| used_by | UUID FK nullable | usuário que aceitou |
 
 ---
 
@@ -228,8 +274,9 @@ Se nada casar, sugerir a menor/mais leve tarefa disponível com mensagem acolhed
 | --- | --- | --- |
 | daily_summary | `config.daily_summary_time` (por fuso) | Envia focos do dia |
 | weekly_review | `weekly_review_dow` + hora | Inicia fluxo de revisão: tarefas paradas + esperas longas (`aguardando` há > `stale_waiting_days`) |
-| reminders_tick | a cada 1 min | Envia lembretes com `remind_at <= now` e `sent=false` |
-| recurrence_roll | diário 00:05 | Recria próximas ocorrências de tarefas recorrentes concluídas |
+| reminders_tick | a cada 1 min | Envia lembretes, desbloqueia tarefas `aguardando` por data e alerta prazo vencido ainda não avisado |
+| medication_rollover | diário 00:01 por usuário | Descarta medicações não tomadas e agenda a próxima ocorrência sem acúmulo |
+| recurrence_roll | ao concluir tarefa recorrente | Recria a próxima ocorrência |
 
 ---
 
@@ -252,14 +299,14 @@ foco-bot/
 │   │   ├── capture.py          # brain dump + texto livre
 │   │   ├── tasks.py            # ver/editar/concluir
 │   │   ├── lists.py            # gerenciar listas
-│   │   ├── now.py              # /agora
-│   │   ├── reviews.py          # diário e semanal
+│   │   ├── agora.py            # /agora
+│   │   ├── rituals.py          # diário, semanal, lembretes e medicações
 │   │   └── couple.py           # /casal
 │   ├── services/
 │   │   ├── task_service.py
-│   │   ├── ai_service.py       # cliente Claude + prompt
-│   │   ├── selection.py        # lógica "o que faço agora"
-│   │   └── scheduler.py        # jobs
+│   │   ├── ai_service.py       # cliente Gemini + prompt + áudio
+│   │   ├── couple_service.py   # pareamento de casal
+│   │   └── gcal_service.py     # motor Google Calendar opcional
 │   └── utils/
 │       ├── dates.py            # parsing de datas PT-BR
 │       └── keyboards.py        # botões inline
@@ -276,11 +323,16 @@ foco-bot/
 
 ```text
 TELEGRAM_BOT_TOKEN=
-ANTHROPIC_API_KEY=
-DATABASE_URL=postgresql+psycopg://user:pass@host:5432/dbname
+BOT_TOKENS=
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.5-flash
+DATABASE_URL=postgresql+psycopg://user:pass@host:5432/dbname?sslmode=require
 AUTHORIZED_CHAT_ID=          # chat_id da usuária (RNF10)
+ALLOWED_CHAT_IDS=            # CSV opcional de outros chats autorizados
 DEFAULT_TIMEZONE=America/Fortaleza
-ANTHROPIC_MODEL=claude-sonnet-4-20250514
+GOOGLE_OAUTH_CLIENT_ID=
+GOOGLE_OAUTH_CLIENT_SECRET=
+GOOGLE_OAUTH_REDIRECT_URI=
 ```
 
 ---
@@ -290,10 +342,11 @@ ANTHROPIC_MODEL=claude-sonnet-4-20250514
 | Fase | Entregas |
 | --- | --- |
 | **F1 — Núcleo de captura** | Modelos, captura texto livre → Inbox, listar, concluir. Sem IA ainda. |
-| **F2 — IA + classificação** | Brain dump multi-tarefa, classificação Claude, aprovação em bloco. |
+| **F2 — IA + classificação** | Brain dump multi-tarefa, classificação Gemini, aprovação em bloco. |
 | **F3 — Priorização** | Quadrante assistido, edição de atributos, /agora. |
 | **F4 — Rituais** | Resumo diário, revisão semanal, lembretes, recorrência. |
 | **F5 — Casal + polimento** | Exportar casal p/ grupo, /config, busca, tom acolhedor. |
+| **F6+ — Pós-MVP implementado** | Captura por voz, medicações, foco, multiusuário/casal real, dependência entre tarefas, `/ordem`, `/progresso`, fundação Google Calendar. |
 
 ---
 
@@ -312,20 +365,20 @@ ANTHROPIC_MODEL=claude-sonnet-4-20250514
 - **Nunca** versionar segredos. O `.gitignore` bloqueia `.env`, chaves e credenciais; apenas `.env.example` (com placeholders vazios) é versionado.
 - Em desenvolvimento: segredos no arquivo `.env` local (fora do Git).
 - Em produção (Railway/Fly.io): segredos como **secrets/variáveis de ambiente da plataforma**, nunca no código nem em logs.
-- Tokens cobertos: `TELEGRAM_BOT_TOKEN`, `ANTHROPIC_API_KEY`, `DATABASE_URL` (contém credenciais do banco).
-- Rotação: se um segredo vazar, revogar e gerar novo no provedor (BotFather, Anthropic Console, Supabase) e atualizar o secret na plataforma. O `AUTHORIZED_CHAT_ID` não é segredo, mas não deve ir para logs públicos.
+- Tokens cobertos: `TELEGRAM_BOT_TOKEN`, `BOT_TOKENS`, `GEMINI_API_KEY`, `DATABASE_URL` e credenciais OAuth do Google.
+- Rotação: se um segredo vazar, revogar e gerar novo no provedor (BotFather, Google AI Studio/Cloud Console, Supabase) e atualizar o secret na plataforma. `AUTHORIZED_CHAT_ID`/`ALLOWED_CHAT_IDS` não são segredos, mas não devem ir para logs públicos.
 
 ### 11.2 Criptografia em trânsito
 
 - **Telegram ↔ bot**: a API do Telegram é exclusivamente HTTPS/TLS; o tráfego é cifrado por padrão.
-- **Bot ↔ Anthropic**: HTTPS/TLS (SDK oficial).
+- **Bot ↔ Google Gemini**: HTTPS/TLS via SDK `google-genai`.
 - **Bot ↔ PostgreSQL (Supabase)**: exigir conexão com **SSL/TLS** (`sslmode=require` na `DATABASE_URL` ou parâmetro equivalente). Não conectar sem TLS.
 - **Webhook (se adotado na evolução)**: somente sobre HTTPS com certificado válido; validar o `secret_token` do webhook do Telegram.
 
 ### 11.3 Criptografia em repouso
 
 - **Banco gerenciado (Supabase)**: criptografia em repouso provida pela plataforma (discos cifrados) + backups gerenciados. É o motivo de preferir Supabase a um SQLite solto.
-- **Dados sensíveis do conteúdo**: as tarefas podem conter informação pessoal (saúde, casa, trabalho). Para o MVP mono-usuário, a criptografia em repouso do provedor é suficiente. **Não** implementar criptografia de campo no MVP (complexidade desnecessária para um único usuário), mas registrar como evolução possível caso o conteúdo de saúde se torne sensível demais.
+- **Dados sensíveis do conteúdo**: as tarefas podem conter informação pessoal (saúde, casa, trabalho). Para a instância privada atual, a criptografia em repouso do provedor é suficiente. **Não** implementar criptografia de campo no MVP (complexidade desnecessária para o escopo atual), mas registrar como evolução possível caso o conteúdo de saúde se torne sensível demais.
 - **Sem armazenamento local de conteúdo** além do necessário; não logar o corpo das tarefas em logs de aplicação.
 
 ### 11.4 Controle de acesso
@@ -337,8 +390,8 @@ ANTHROPIC_MODEL=claude-sonnet-4-20250514
 ### 11.5 Dados pessoais e privacidade
 
 - Princípio de **minimização**: não coletar dados além de tarefas e configurações.
-- A `ANTHROPIC_API_KEY` envia o texto das tarefas para a API da Anthropic para classificação — isso é inerente ao funcionamento. Documentar isso para a usuária (é a própria dona dos dados, mas vale registrar a consciência do fluxo).
-- Não compartilhar dados com terceiros além do estritamente funcional (Telegram, Anthropic, banco).
+- A `GEMINI_API_KEY` envia o texto das tarefas e, quando usado, áudio para a API Google Gemini para classificação/transcrição — isso é inerente ao funcionamento. Documentar isso para a usuária (é a própria dona dos dados, mas vale registrar a consciência do fluxo).
+- Não compartilhar dados com terceiros além do estritamente funcional (Telegram, Google Gemini, banco e Google Calendar quando ativado).
 - Backups: confiar no backup gerenciado do Supabase; não exportar dumps para locais não cifrados.
 
 ### 11.6 Boas práticas de código (checklist)
