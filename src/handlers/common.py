@@ -391,6 +391,10 @@ async def cmd_retomar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 # /progresso (v1.19.0, ex-/projetos)
 # ---------------------------------------------------------------------------
 
+_PROGRESSO_DEFAULT_DAYS = 30
+_PROGRESSO_MAX_DAYS = 365
+
+
 async def cmd_progresso(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_authorized(update):
         await deny_unauthorized(update)
@@ -398,12 +402,29 @@ async def cmd_progresso(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     msg = update.effective_message
     if not msg:
         return
+
+    days = _PROGRESSO_DEFAULT_DAYS
+    aviso: str | None = None
+    if context.args:
+        try:
+            days = max(1, int(context.args[0]))
+            if days > _PROGRESSO_MAX_DAYS:
+                aviso = textos.msg_progresso_limite(days, _PROGRESSO_MAX_DAYS)
+                days = _PROGRESSO_MAX_DAYS
+        except ValueError:
+            await msg.reply_text("Uso: /progresso [dias]  — ex: /progresso 60")
+            return
+
     chat_id = update.effective_chat.id
-    dados = await asyncio.to_thread(task_service.get_progresso, chat_id)
+    dados = await asyncio.to_thread(task_service.get_progresso, chat_id, days)
     if not dados:
         await msg.reply_text(textos.MSG_PROGRESSO_VAZIO)
         return
-    await msg.reply_text(textos.msg_progresso(dados))
+
+    texto = textos.msg_progresso(dados, days=days)
+    if aviso:
+        texto = aviso + "\n\n" + texto
+    await msg.reply_text(texto)
 
 
 async def cmd_projetos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

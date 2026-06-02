@@ -1729,14 +1729,14 @@ def get_projetos(chat_id: int) -> list[ProjetoInfo]:
     return get_progresso(chat_id)
 
 
-def get_progresso(chat_id: int) -> list[ProjetoInfo]:
-    """Retorna progresso de TODAS as listas ativas. Listas de casal incluem breakdown por dono."""
+def get_progresso(chat_id: int, days: int = 30) -> list[ProjetoInfo]:
+    """Retorna progresso de TODAS as listas ativas para a janela de `days` dias."""
     with get_session() as session:
         user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
         if user is None:
             return []
 
-        cutoff_30d = _now() - timedelta(days=30)
+        cutoff_30d = _now() - timedelta(days=days)
 
         # Parceiro (se houver casal)
         couple_id = _couple_id_for(session, user.id)

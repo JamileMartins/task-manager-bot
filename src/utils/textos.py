@@ -1270,12 +1270,20 @@ def msg_projetos(projetos) -> str:
     return msg_progresso(projetos)
 
 
-def msg_progresso(projetos) -> str:
+def msg_progresso_limite(solicitado: int, maximo: int) -> str:
+    return (
+        f"⚠️ Período máximo suportado: {maximo} dias. "
+        f"Exibindo os últimos {maximo} dias (você pediu {solicitado})."
+    )
+
+
+def msg_progresso(projetos, days: int = 30) -> str:
     import pytz
     from datetime import timezone as _tz
     tz = pytz.timezone("America/Fortaleza")
 
-    lines = ["📊 Progresso\n"]
+    periodo = f"últimos {days} dias" if days != 30 else "últimos 30 dias"
+    lines = [f"📊 Progresso · {periodo}\n"]
     for p in projetos:
         total = p.open_count + p.done_30d
         barra = _barra_progresso(p.done_30d, total)
