@@ -394,6 +394,21 @@ def find_list_by_term(chat_id: int, term: str) -> Optional[TaskList]:
         return None
 
 
+def task_title_exists_in_list(title: str, list_id: Optional[uuid.UUID], exclude_task_id: uuid.UUID) -> bool:
+    """Verifica se já existe uma tarefa aberta com o mesmo título (case-insensitive) na lista destino."""
+    with get_session() as session:
+        q = select(Task.id).where(
+            Task.id != exclude_task_id,
+            Task.status.notin_(["concluida", "arquivada"]),
+            func.lower(Task.title) == title.lower(),
+        )
+        if list_id is None:
+            q = q.where(Task.list_id.is_(None))
+        else:
+            q = q.where(Task.list_id == list_id)
+        return session.scalar(q) is not None
+
+
 def get_tasks_for_list(list_id: uuid.UUID) -> list[Task]:
     with get_session() as session:
         return session.scalars(

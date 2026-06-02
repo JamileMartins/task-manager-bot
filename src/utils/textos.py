@@ -121,6 +121,18 @@ MSG_ERRO_GENERICO = (
 )
 
 
+def msg_mover_duplicada(titulo: str, lista_nome: str) -> str:
+    return (
+        f"⚠️ Já existe uma tarefa chamada _{titulo}_ nessa lista ({lista_nome}).\n\n"
+        "Mover mesmo assim vai criar uma duplicata. Quer continuar?"
+    )
+
+
+MSG_MOVER_MESMA_LISTA = "Essa tarefa já está nessa lista 😊"
+
+MSG_MOVER_OK = "Tarefa movida ✅"
+
+
 # ---------------------------------------------------------------------------
 # Captura
 # ---------------------------------------------------------------------------

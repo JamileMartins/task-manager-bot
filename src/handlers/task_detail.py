@@ -286,6 +286,38 @@ async def cb_task_start_move(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
 
+async def _resolve_move_target(
+    list_idx: int, listas: list[dict]
+) -> tuple[uuid.UUID | None, str]:
+    """Retorna (new_list_id, lista_nome) para o índice dado."""
+    if list_idx == -1:
+        return None, "Inbox"
+    if 0 <= list_idx < len(listas):
+        return uuid.UUID(listas[list_idx]["id"]), listas[list_idx]["name"]
+    return None, ""  # índice inválido
+
+
+async def _execute_move(query, task_id: uuid.UUID, new_list_id: uuid.UUID | None, context) -> None:
+    """Executa o move e atualiza o detalhe. Trata BadRequest do Telegram separadamente."""
+    from telegram.error import BadRequest as TelegramBadRequest
+    try:
+        await asyncio.to_thread(task_service.update_task_attrs, task_id, list_id=new_list_id)
+        await _refresh_detail(query, task_id, context)
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e).lower():
+            # Tarefa já estava nessa lista — mostra toast e não altera a tela
+            await query.answer(textos.MSG_MOVER_MESMA_LISTA, show_alert=True)
+        else:
+            logger.exception("Telegram BadRequest ao mover tarefa %s", task_id)
+            await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+    except Exception:
+        logger.exception("Erro ao mover tarefa %s para list_id=%s", task_id, new_list_id)
+        await query.edit_message_text(
+            "Não foi possível mover a tarefa 😕\n"
+            "Tente novamente ou volte ao detalhe da tarefa."
+        )
+
+
 async def cb_task_move_to(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
@@ -301,20 +333,55 @@ async def cb_task_move_to(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     task_id = uuid.UUID(task_id_str)
-    if list_idx == -1:
-        new_list_id = None
-    elif 0 <= list_idx < len(listas):
-        new_list_id: uuid.UUID | None = uuid.UUID(listas[list_idx]["id"])
-    else:
+    new_list_id, lista_nome = await _resolve_move_target(list_idx, listas)
+    if list_idx != -1 and not lista_nome:
         await query.edit_message_text(textos.MSG_ERRO_GENERICO)
         return
 
-    try:
-        await asyncio.to_thread(task_service.update_task_attrs, task_id, list_id=new_list_id)
-        await _refresh_detail(query, task_id, context)
-    except Exception:
-        logger.exception("Erro ao mover tarefa %s", task_id)
+    # Verifica duplicata de nome na lista destino
+    task = await asyncio.to_thread(task_service.get_task_with_list, task_id)
+    if task is None:
         await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+        return
+
+    # Verifica se já está na lista destino
+    current_list_id = task.list_id
+    if current_list_id == new_list_id:
+        await query.answer(textos.MSG_MOVER_MESMA_LISTA, show_alert=True)
+        return
+
+    duplicate = await asyncio.to_thread(
+        task_service.task_title_exists_in_list, task.title, new_list_id, task_id
+    )
+    if duplicate:
+        await query.edit_message_text(
+            textos.msg_mover_duplicada(task.title, lista_nome),
+            reply_markup=keyboards.kb_mover_confirmar_duplicata(task_id_str, list_idx),
+            parse_mode="Markdown",
+        )
+        return
+
+    await _execute_move(query, task_id, new_list_id, context)
+
+
+async def cb_task_move_force(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Confirma a movimentação mesmo havendo duplicata de nome."""
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+
+    parts = query.data.split(":")  # mv_force:{task_id}:{list_idx}
+    task_id = uuid.UUID(parts[1])
+    list_idx = int(parts[2])
+    listas = context.user_data.get(_MOVE_LISTAS_KEY, [])
+
+    new_list_id, lista_nome = await _resolve_move_target(list_idx, listas)
+    if list_idx != -1 and not lista_nome:
+        await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+        return
+
+    await _execute_move(query, task_id, new_list_id, context)
 
 
 # ---------------------------------------------------------------------------

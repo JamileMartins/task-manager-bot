@@ -300,6 +300,13 @@ def kb_cancelar(task_id: str) -> InlineKeyboardMarkup:
     ]])
 
 
+def kb_mover_confirmar_duplicata(task_id: str, list_idx: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ Sim, mover", callback_data=f"mv_force:{task_id}:{list_idx}"),
+        InlineKeyboardButton("✖️ Cancelar", callback_data=f"task_dt:{task_id}"),
+    ]])
+
+
 def kb_mover_tarefa(task_id: str, listas: list[dict]) -> InlineKeyboardMarkup:
     from src.utils.textos import lista_emoji
     rows: list[list[InlineKeyboardButton]] = []
