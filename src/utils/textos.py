@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import random
 
-from src.version import __version__
+from src.version import __release_date__, __version__
 
 
 def _pick(*variants: str) -> str:
@@ -15,7 +15,7 @@ def _pick(*variants: str) -> str:
 # ---------------------------------------------------------------------------
 
 MSG_BOAS_VINDAS = (
-    "Oi! Eu sou o Task Manager 🧠\n\n"
+    f"Oi! Eu sou o Task Manager v{__version__} 🧠\n\n"
     "Pensa em mim como um lugar pra despejar tudo que tá na sua cabeça — "
     "sem se preocupar em organizar. Disso eu cuido.\n\n"
     "É só me mandar o que precisa fazer, do jeito que vier. "
@@ -56,7 +56,7 @@ MSG_AJUDA = (
     "📖 /quadrantes — o que significam Q1, Q2, Q3, Q4 e como uso a energia\n\n"
     "Dica: você quase nunca precisa de comando. "
     "Só me manda o que vier na cabeça.\n\n"
-    f"Task Manager v{__version__}"
+    f"Task Manager v{__version__} · publicado em {__release_date__}"
 )
 
 MSG_GUIA_QUADRANTES = (
