@@ -324,9 +324,9 @@ def kb_mover_tarefa(task_id: str, listas: list[dict]) -> InlineKeyboardMarkup:
 # Impedimentos (F4)
 # ---------------------------------------------------------------------------
 
-def kb_blocker_types(task_id: uuid.UUID) -> InlineKeyboardMarkup:
+def kb_blocker_types(task_id: uuid.UUID, show_skip: bool = False) -> InlineKeyboardMarkup:
     tid = str(task_id)
-    return InlineKeyboardMarkup([
+    rows = [
         [
             InlineKeyboardButton("🌫️ Grande/vaga", callback_data=f"blk_t:{tid}:vaga_grande"),
             InlineKeyboardButton("🤔 Falta decidir", callback_data=f"blk_t:{tid}:decisao_pendente"),
@@ -339,8 +339,52 @@ def kb_blocker_types(task_id: uuid.UUID) -> InlineKeyboardMarkup:
             InlineKeyboardButton("🧩 Falta algo", callback_data=f"blk_t:{tid}:recurso_info"),
             InlineKeyboardButton("📅 Só em outra data", callback_data=f"blk_t:{tid}:data_externa"),
         ],
+        [
+            InlineKeyboardButton("🔗 Depende de outra tarefa", callback_data=f"blk_t:{tid}:tarefa_bloqueadora"),
+        ],
         [InlineKeyboardButton("🗑️ Não importa mais", callback_data=f"blk_t:{tid}:obsoleta")],
-    ])
+    ]
+    if show_skip:
+        rows.append([InlineKeyboardButton("⏭️ Pular sem registrar", callback_data=f"ag_pular:{tid}")])
+    return InlineKeyboardMarkup(rows)
+
+
+def kb_blocker_nota(task_id: uuid.UUID) -> InlineKeyboardMarkup:
+    tid = str(task_id)
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("📝 Adicionar nota", callback_data=f"blk_nota_s:{tid}"),
+        InlineKeyboardButton("✅ Pronto", callback_data=f"blk_nota_skip:{tid}"),
+    ]])
+
+
+_TASKS_PER_PAGE = 6
+
+
+def kb_blocker_task_select(
+    tasks: list[Task],
+    blocked_task_id: uuid.UUID,
+    page: int = 0,
+) -> InlineKeyboardMarkup:
+    """Teclado paginado para selecionar tarefa bloqueadora."""
+    tid = str(blocked_task_id)
+    start = page * _TASKS_PER_PAGE
+    page_tasks = tasks[start : start + _TASKS_PER_PAGE]
+    total_pages = (len(tasks) + _TASKS_PER_PAGE - 1) // _TASKS_PER_PAGE
+
+    rows = []
+    for task in page_tasks:
+        label = task.title[:40] + ("…" if len(task.title) > 40 else "")
+        rows.append([InlineKeyboardButton(label, callback_data=f"blk_dep:{tid}:{task.id}")])
+
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton("◀ Anterior", callback_data=f"blk_tp:{tid}:{page - 1}"))
+    if page < total_pages - 1:
+        nav.append(InlineKeyboardButton("Próxima ▶", callback_data=f"blk_tp:{tid}:{page + 1}"))
+    if nav:
+        rows.append(nav)
+
+    return InlineKeyboardMarkup(rows)
 
 
 def kb_blocker_pessoa(task_id: uuid.UUID) -> InlineKeyboardMarkup:

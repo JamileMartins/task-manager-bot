@@ -70,14 +70,32 @@ async def cb_agora_energia(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def cb_agora_outra(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Pular tarefa: pergunta o motivo antes de mostrar a próxima."""
     query = update.callback_query
     await query.answer()
     if not is_authorized(update):
         return
     task_id_str = query.data.split(":")[1]
+    task_id = uuid.UUID(task_id_str)
+
+    # Adiciona à lista de excluídos da sessão imediatamente
     excluidos: list[str] = context.user_data.get(_EXCLUIDOS_KEY, [])
-    excluidos.append(task_id_str)
+    if task_id_str not in excluidos:
+        excluidos.append(task_id_str)
     context.user_data[_EXCLUIDOS_KEY] = excluidos
+
+    await query.edit_message_text(
+        textos.MSG_AGORA_TRAVADA,
+        reply_markup=keyboards.kb_blocker_types(task_id, show_skip=True),
+    )
+
+
+async def cb_agora_pular(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Pular sem registrar impedimento — mostra a próxima tarefa."""
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
     await _show_agora_task(query, update, context)
 
 
@@ -89,7 +107,8 @@ async def cb_agora_concluir(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     task_id = query.data.split(":")[1]
     try:
         task = await asyncio.to_thread(task_service.get_task_with_list, task_id)
-        await asyncio.to_thread(task_service.complete_task, task_id)
+        unblocked = await asyncio.to_thread(task_service.complete_task, task_id)
+
         if task is not None and getattr(task, "couple_id", None) is not None:
             actor = (update.effective_user.full_name if update.effective_user else None) or "Seu par"
             if getattr(task, "couple_joint", False):
@@ -97,7 +116,16 @@ async def cb_agora_concluir(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             else:
                 texto = textos.msg_casal_concluiu(actor, task.title)
             await notify.notify_partner(update.effective_chat.id, context.bot, texto)
+
         await query.edit_message_text(textos.msg_conclusao())
+
+        # Notificar tarefas que foram desbloqueadas automaticamente
+        task_title = task.title if task else ""
+        for title in unblocked:
+            await query.message.reply_text(
+                textos.msg_auto_unblock_dependency(title, task_title),
+                parse_mode="Markdown",
+            )
     except Exception:
         logger.exception("Erro ao concluir tarefa pelo /agora")
         await query.edit_message_text(textos.MSG_ERRO_GENERICO)

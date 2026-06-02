@@ -19,6 +19,17 @@ logger = logging.getLogger(__name__)
 
 _BLK_TASK_KEY = "blk_task_id"
 _BLK_STEP_KEY = "blk_next_step"
+_BLK_NOTE_KEY = "blk_note_task_id"   # set quando aguardando texto de nota do usuário
+_BLK_DEP_TASKS_KEY = "blk_dep_tasks" # lista de tasks disponíveis para seleção de dependência
+
+
+async def _offer_note(query, task_id: uuid.UUID) -> None:
+    """Envia mensagem separada oferecendo o campo de nota livre."""
+    await query.message.reply_text(
+        textos.MSG_BLOCKER_NOTA_PEDIR,
+        reply_markup=keyboards.kb_blocker_nota(task_id),
+        parse_mode="Markdown",
+    )
 
 
 def _now_tz():
@@ -118,6 +129,21 @@ async def cb_blocker_type(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             textos.MSG_BLOCKER_DATA_QUANDO,
             reply_markup=keyboards.kb_blocker_data_externa(task_id),
         )
+
+    elif blocker_type == "tarefa_bloqueadora":
+        chat_id = update.effective_chat.id
+        tasks = await asyncio.to_thread(
+            task_service.get_pending_tasks_for_selection, chat_id, task_id
+        )
+        if not tasks:
+            await query.edit_message_text(textos.MSG_BLOCKER_DEPENDE_VAZIA)
+            return
+        context.user_data[_BLK_DEP_TASKS_KEY] = [str(t.id) for t in tasks]
+        await query.edit_message_text(
+            textos.MSG_BLOCKER_DEPENDE_ESCOLHA,
+            reply_markup=keyboards.kb_blocker_task_select(tasks, task_id, page=0),
+        )
+        return  # fluxo continua em cb_blocker_dep_pick
 
     elif blocker_type == "obsoleta":
         await query.edit_message_text(
@@ -244,6 +270,7 @@ async def cb_blocker_aguardar(update: Update, context: ContextTypes.DEFAULT_TYPE
     task_id = uuid.UUID(query.data.split(":")[1])
     await asyncio.to_thread(task_service.set_waiting, task_id)
     await query.edit_message_text(textos.MSG_BLOCKER_AGUARDANDO)
+    await _offer_note(query, task_id)
 
 
 async def cb_blocker_cobrar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -286,6 +313,7 @@ async def cb_blocker_cobrar_date(update: Update, context: ContextTypes.DEFAULT_T
 
     data_fmt = remind_at.strftime("%d/%m")
     await query.edit_message_text(textos.msg_blocker_cobrar_ok(data_fmt))
+    await _offer_note(query, task_id)
 
 
 # ---------------------------------------------------------------------------
@@ -308,6 +336,7 @@ async def cb_blocker_data_date(update: Update, context: ContextTypes.DEFAULT_TYP
     await asyncio.to_thread(task_service.set_waiting, task_id, due_at=due)
     data_fmt = due.strftime("%d/%m")
     await query.edit_message_text(textos.msg_blocker_data_ok(data_fmt))
+    await _offer_note(query, task_id)
 
 
 # ---------------------------------------------------------------------------
@@ -332,6 +361,106 @@ async def cb_blocker_keep(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     await query.edit_message_text(textos.MSG_BLOCKER_KEEP)
+
+
+# ---------------------------------------------------------------------------
+# Nota livre no impedimento
+# ---------------------------------------------------------------------------
+
+async def cb_blocker_nota_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Sinaliza que o próximo texto do usuário será a nota do impedimento."""
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+
+    task_id_str = query.data.split(":")[1]
+    context.user_data[_BLK_NOTE_KEY] = task_id_str
+    await query.edit_message_text(textos.MSG_BLOCKER_NOTA_MANDE)
+
+
+async def cb_blocker_nota_skip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Usuária optou por não adicionar nota."""
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+    context.user_data.pop(_BLK_NOTE_KEY, None)
+    await query.edit_message_text("Ok, sem nota ✅")
+
+
+async def handle_blocker_note_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Intercepta texto livre quando há nota de bloqueio pendente.
+
+    Retorna True se o texto foi consumido como nota (handler de captura deve parar).
+    """
+    task_id_str = context.user_data.get(_BLK_NOTE_KEY)
+    if not task_id_str:
+        return False
+
+    note = (update.message.text or "").strip()
+    if not note:
+        return False
+
+    context.user_data.pop(_BLK_NOTE_KEY, None)
+    await asyncio.to_thread(task_service.set_blocker_note, task_id_str, note)
+    await update.message.reply_text(textos.MSG_BLOCKER_NOTA_SALVA)
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Dependência de tarefa (tarefa_bloqueadora)
+# ---------------------------------------------------------------------------
+
+async def cb_blocker_dep_pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Usuária escolheu a tarefa que bloqueia a atual."""
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+
+    # blk_dep:{blocked_task_id}:{blocking_task_id}
+    parts = query.data.split(":")
+    blocked_id = uuid.UUID(parts[1])
+    blocking_id = uuid.UUID(parts[2])
+
+    blocking_task = await asyncio.to_thread(task_service.get_task_with_list, blocking_id)
+    if blocking_task is None:
+        await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+        return
+
+    await asyncio.to_thread(task_service.set_blocked_by_task, blocked_id, blocking_id)
+    context.user_data.pop(_BLK_DEP_TASKS_KEY, None)
+
+    await query.edit_message_text(
+        textos.msg_blocker_depende_ok(blocking_task.title),
+        parse_mode="Markdown",
+    )
+
+
+async def cb_blocker_dep_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Paginação na lista de seleção de tarefa bloqueadora."""
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+
+    # blk_tp:{blocked_task_id}:{page}
+    parts = query.data.split(":")
+    blocked_id = uuid.UUID(parts[1])
+    page = int(parts[2])
+
+    chat_id = update.effective_chat.id
+    tasks = await asyncio.to_thread(
+        task_service.get_pending_tasks_for_selection, chat_id, blocked_id
+    )
+    if not tasks:
+        await query.edit_message_text(textos.MSG_BLOCKER_DEPENDE_VAZIA)
+        return
+
+    await query.edit_message_reply_markup(
+        reply_markup=keyboards.kb_blocker_task_select(tasks, blocked_id, page=page),
+    )
 
 
 # ---------------------------------------------------------------------------

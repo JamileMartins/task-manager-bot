@@ -96,6 +96,9 @@ class Task(Base):
     parent_task_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("tasks.id"), nullable=True
     )
+    blocked_by_task_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True
+    )
     waiting_since: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     due_alerted: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
     # Google Calendar (C6) — id do evento espelhado e quando foi sincronizado.

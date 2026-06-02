@@ -478,6 +478,47 @@ MSG_BLOCKER_ARQUIVADA = "Arquivada sem culpa 🗑️"
 MSG_BLOCKER_KEEP = "Ok, mantida como está."
 MSG_UNBLOCK_OK = "Destravada ✅ Voltou pras suas tarefas ativas."
 
+# --- Nota livre no impedimento ---
+
+MSG_BLOCKER_NOTA_PEDIR = (
+    "Quer deixar uma nota sobre o impedimento?\n"
+    "Ex: _'Preciso comprar tinta na loja X'_ ou _'Aguardando resposta da Maria'_"
+)
+
+MSG_BLOCKER_NOTA_SALVA = "Nota salva ✅"
+
+MSG_BLOCKER_NOTA_MANDE = "Mande a nota (uma frase curta):"
+
+# --- Dependência de outra tarefa ---
+
+MSG_BLOCKER_DEPENDE_ESCOLHA = (
+    "Qual tarefa precisa ser concluída primeiro?\n\n"
+    "Escolha uma da lista:"
+)
+
+MSG_BLOCKER_DEPENDE_VAZIA = (
+    "Você não tem tarefas abertas para vincular aqui.\n"
+    "Crie a tarefa bloqueadora primeiro e tente novamente."
+)
+
+
+def msg_blocker_depende_ok(blocking_title: str) -> str:
+    return (
+        f"Entendido ✅\n\n"
+        f"Essa tarefa fica pausada até _\"{blocking_title}\"_ ser concluída.\n"
+        "Quando você marcar aquela como feita, essa volta automaticamente para suas ativas."
+    )
+
+
+def msg_auto_unblock_dependency(unblocked_title: str, blocking_title: str) -> str:
+    return (
+        f"🔓 *{unblocked_title}* foi desbloqueada!\n\n"
+        f"Você concluiu _{blocking_title}_ e essa tarefa voltou para suas ativas.\n"
+        "Quer atacá-la agora? /agora"
+    )
+
+
+# --- Auto-unblock por data ---
 
 def msg_auto_unblock(title: str) -> str:
     return (
@@ -485,6 +526,13 @@ def msg_auto_unblock(title: str) -> str:
         "Chegou a data que você estava esperando — voltei com essa tarefa pras suas ativas. "
         "Quer dar uma olhada no /agora? 🙂"
     )
+
+
+# --- /agora skip com blocker ---
+
+MSG_AGORA_TRAVADA = "Tudo bem. O que está travando essa tarefa?"
+
+MSG_AGORA_PULAR_MESMO = "Pular sem registrar"
 
 
 # ---------------------------------------------------------------------------

@@ -52,11 +52,17 @@ Tabelas: `users`, `lists`, `tasks`, `reminders`, `config`. Detalhes completos em
 - `tasks.energy` em {alta, media, baixa}; `tasks.estimate_min` em minutos.
 - `tasks.last_touched_at` alimenta a revisão semanal (parada há N dias).
 - `tasks.status` inclui `aguardando` (tarefa com impedimento externo, fora do radar ativo).
-- `tasks.blocker_type` (vaga_grande, decisao_pendente, aversiva_energia, pessoa, recurso_info, data_externa, obsoleta) + `blocker_note`, `blocker_is_external`, `next_step`, `parent_task_id` para subtarefas.
+- `tasks.blocker_type` (vaga_grande, decisao_pendente, aversiva_energia, pessoa, recurso_info, data_externa, obsoleta, **tarefa_bloqueadora**) + `blocker_note` (nota livre opcional), `blocker_is_external`, `next_step`, `parent_task_id` para subtarefas, `blocked_by_task_id` para dependência entre tarefas.
 
 ## Impedimentos (regra central)
 
-Tarefa parada tem causa nomeável. O sistema distingue impedimento **interno** (resolver agora: quebrar em próximo passo, ou virar "decidir X") de **externo** (sair do radar: status `aguardando` + gatilho de retomada por data ou cobrança). O bot pergunta o impedimento na revisão semanal, ao pular no `/agora` e sob demanda. Para `vaga_grande`, a IA sempre sugere o menor próximo passo (≤ 2 min) como subtarefa. Tarefas `aguardando` nunca aparecem no `/agora` nem nos focos do dia. A revisão semanal tem uma seção de **esperas longas**: tarefas `aguardando` há mais de `stale_waiting_days` (padrão 14), com opções cobrar/desbloquear/arquivar/seguir esperando. Gravar `waiting_since` na entrada do estado e limpar ao desbloquear. Detalhes em `docs/01_PRD.md` §3.6 e §6.6.
+Tarefa parada tem causa nomeável. O sistema distingue impedimento **interno** (resolver agora: quebrar em próximo passo, ou virar "decidir X") de **externo** (sair do radar: status `aguardando` + gatilho de retomada por data ou cobrança). O bot pergunta o impedimento na revisão semanal, ao pular no `/agora` (sempre) e sob demanda no detalhe da tarefa. Para `vaga_grande`, a IA sempre sugere o menor próximo passo (≤ 2 min) como subtarefa. Tarefas `aguardando` nunca aparecem no `/agora` nem nos focos do dia. A revisão semanal tem uma seção de **esperas longas**: tarefas `aguardando` há mais de `stale_waiting_days` (padrão 14), com opções cobrar/desbloquear/arquivar/seguir esperando. Gravar `waiting_since` na entrada do estado e limpar ao desbloquear.
+
+**Dependência entre tarefas** (`tarefa_bloqueadora`): a usuária pode vincular uma tarefa a outra existente como bloqueadora. A tarefa dependente fica em `aguardando` com `blocked_by_task_id` preenchido. Ao concluir a bloqueadora, `complete_task()` auto-desbloqueia todas as dependentes (status → `aberta`, campos limpos) e retorna a lista de títulos desbloqueados para notificação.
+
+**Nota livre de impedimento**: após qualquer tipo de bloqueio, o bot oferece campo de texto opcional (`blocker_note`) para detalhar o impedimento (ex: "Preciso comprar tinta na loja X"). O próximo texto do usuário é interceptado em `handle_capture` via flag `blk_note_task_id` no `user_data`.
+
+Detalhes em `docs/01_PRD.md` §3.6 e §6.6.
 
 ## Contrato do serviço de IA
 

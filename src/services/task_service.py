@@ -229,12 +229,17 @@ def _med_due_for_date(task: Task, day_start: datetime) -> datetime:
     return _apply_med_time(day_start, task.notes)
 
 
-def complete_task(task_id: str | uuid.UUID) -> bool:
+def complete_task(task_id: str | uuid.UUID) -> list[str]:
+    """Conclui a tarefa e auto-desbloqueia dependentes.
+
+    Retorna lista de títulos das tarefas que foram desbloqueadas automaticamente.
+    Retorna lista vazia se a tarefa não existia ou já estava concluída.
+    """
     uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
     with get_session() as session:
         task = session.get(Task, uid)
         if task is None or task.status == "concluida":
-            return False
+            return []
         now = _now()
         task.status = "concluida"
         task.completed_at = now
@@ -243,29 +248,46 @@ def complete_task(task_id: str | uuid.UUID) -> bool:
         if task.recurrence:
             base = task.due_at if task.due_at else now
             next_due = _recurrence_next_due(task.recurrence, base)
-            if next_due is None:
-                return True
-            next_due = _apply_med_time(next_due, task.notes)
-            next_task = Task(
-                user_id=task.user_id,
-                list_id=task.list_id,
-                title=task.title,
-                notes=task.notes,
-                quadrant=task.quadrant,
-                due_at=next_due,
-                recurrence=task.recurrence,
-                estimate_min=task.estimate_min,
-                energy=task.energy,
-                status="aberta",
-                sort_order=task.sort_order,
-                created_at=now,
-                last_touched_at=now,
-            )
-            session.add(next_task)
-            session.flush()
-            _sync_reminder(session, next_task)
+            if next_due is not None:
+                next_due = _apply_med_time(next_due, task.notes)
+                next_task = Task(
+                    user_id=task.user_id,
+                    list_id=task.list_id,
+                    title=task.title,
+                    notes=task.notes,
+                    quadrant=task.quadrant,
+                    due_at=next_due,
+                    recurrence=task.recurrence,
+                    estimate_min=task.estimate_min,
+                    energy=task.energy,
+                    status="aberta",
+                    sort_order=task.sort_order,
+                    created_at=now,
+                    last_touched_at=now,
+                )
+                session.add(next_task)
+                session.flush()
+                _sync_reminder(session, next_task)
 
-        return True
+        # Auto-desbloquear tarefas que dependiam desta
+        dependentes = session.scalars(
+            select(Task).where(
+                Task.blocked_by_task_id == uid,
+                Task.status != "concluida",
+            )
+        ).all()
+        unblocked_titles: list[str] = []
+        for dep in dependentes:
+            dep.status = "aberta"
+            dep.waiting_since = None
+            dep.blocker_type = None
+            dep.blocker_is_external = None
+            dep.blocker_note = None
+            dep.blocked_by_task_id = None
+            dep.last_touched_at = now
+            unblocked_titles.append(dep.title)
+
+        return unblocked_titles
 
 
 # ---------------------------------------------------------------------------
@@ -994,8 +1016,9 @@ def set_blocker(
     blocker_type: str,
     *,
     is_external: bool | None = None,
+    note: str | None = None,
 ) -> Optional[Task]:
-    """Salva o tipo de impedimento na tarefa."""
+    """Salva o tipo de impedimento na tarefa, opcionalmente com nota livre."""
     uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
     _external_types = {"pessoa", "recurso_info", "data_externa"}
     if is_external is None:
@@ -1006,8 +1029,79 @@ def set_blocker(
             return None
         task.blocker_type = blocker_type
         task.blocker_is_external = is_external
+        if note is not None:
+            task.blocker_note = note.strip()[:500]
         task.last_touched_at = _now()
         return task
+
+
+def set_blocker_note(task_id: str | uuid.UUID, note: str) -> Optional[Task]:
+    """Salva ou atualiza a nota livre de um impedimento já registrado."""
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        task = session.get(Task, uid)
+        if task is None:
+            return None
+        task.blocker_note = note.strip()[:500]
+        task.last_touched_at = _now()
+        return task
+
+
+def set_blocked_by_task(
+    task_id: str | uuid.UUID,
+    blocking_task_id: str | uuid.UUID,
+) -> Optional[Task]:
+    """Vincula task_id como dependente de blocking_task_id e coloca em aguardando."""
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    blk_uid = uuid.UUID(str(blocking_task_id)) if isinstance(blocking_task_id, str) else blocking_task_id
+    with get_session() as session:
+        task = session.get(Task, uid)
+        blocking = session.get(Task, blk_uid)
+        if task is None or blocking is None:
+            return None
+        now = _now()
+        task.blocked_by_task_id = blk_uid
+        task.blocker_type = "tarefa_bloqueadora"
+        task.blocker_is_external = False
+        task.status = "aguardando"
+        task.waiting_since = now
+        task.last_touched_at = now
+        return task
+
+
+def get_tasks_blocked_by(task_id: str | uuid.UUID) -> list[Task]:
+    """Retorna todas as tarefas pendentes que dependem de task_id."""
+    uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
+    with get_session() as session:
+        return session.scalars(
+            select(Task).where(
+                Task.blocked_by_task_id == uid,
+                Task.status != "concluida",
+            )
+        ).all()
+
+
+def get_pending_tasks_for_selection(
+    chat_id: int,
+    exclude_task_id: str | uuid.UUID,
+    limit: int = 40,
+) -> list[Task]:
+    """Lista tarefas abertas do usuário para seleção como bloqueadora."""
+    exc_uid = uuid.UUID(str(exclude_task_id)) if isinstance(exclude_task_id, str) else exclude_task_id
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return []
+        return session.scalars(
+            select(Task)
+            .where(
+                Task.user_id == user.id,
+                Task.status == "aberta",
+                Task.id != exc_uid,
+            )
+            .order_by(Task.sort_order, Task.created_at)
+            .limit(limit)
+        ).all()
 
 
 def set_waiting(task_id: str | uuid.UUID, *, due_at: Optional[datetime] = None) -> Optional[Task]:
@@ -1039,7 +1133,7 @@ def reset_waiting_since(task_id: str | uuid.UUID) -> Optional[Task]:
 
 
 def unblock_task(task_id: str | uuid.UUID) -> Optional[Task]:
-    """Desbloqueaia tarefa: volta para 'aberta' e limpa campos de bloqueio."""
+    """Desbloqueia a tarefa: volta para 'aberta' e limpa todos os campos de bloqueio."""
     uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id
     with get_session() as session:
         task = session.get(Task, uid)
@@ -1050,6 +1144,7 @@ def unblock_task(task_id: str | uuid.UUID) -> Optional[Task]:
         task.blocker_type = None
         task.blocker_is_external = None
         task.blocker_note = None
+        task.blocked_by_task_id = None
         task.last_touched_at = _now()
         return task
 

@@ -250,7 +250,7 @@ def test_complete_task_muda_status(svc):
 
     resultado = task_service.complete_task(task.id)
 
-    assert resultado is True
+    assert isinstance(resultado, list)
     svc.refresh(task)
     assert task.status == "concluida"
     assert task.completed_at is not None
@@ -275,11 +275,11 @@ def test_complete_task_ja_concluida_e_idempotente(svc):
 
     resultado = task_service.complete_task(task.id)
 
-    assert resultado is False  # não altera tarefa já concluída
+    assert resultado == []  # não altera tarefa já concluída
 
 
-def test_complete_task_inexistente_retorna_false(svc):
-    assert task_service.complete_task(uuid.uuid4()) is False
+def test_complete_task_inexistente_retorna_lista_vazia(svc):
+    assert task_service.complete_task(uuid.uuid4()) == []
 
 
 def test_complete_task_aceita_string_uuid(svc):
@@ -288,7 +288,7 @@ def test_complete_task_aceita_string_uuid(svc):
 
     resultado = task_service.complete_task(str(task.id))
 
-    assert resultado is True
+    assert isinstance(resultado, list)
 
 
 # ---------------------------------------------------------------------------
@@ -2495,3 +2495,153 @@ def test_set_task_category_remove_categoria(svc):
 def test_set_task_category_tarefa_inexistente_retorna_none(svc):
     import uuid as _uuid
     assert task_service.set_task_category(_uuid.uuid4(), "medicacao") is None
+
+
+# ---------------------------------------------------------------------------
+# Impedimentos: nota livre, dependência e auto-unblock (v1.17.0)
+# ---------------------------------------------------------------------------
+
+def test_set_blocker_com_nota_salva_nota(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+
+    task_service.set_blocker(t.id, "recurso_info", note="Preciso comprar tinta azul")
+    svc.refresh(t)
+
+    assert t.blocker_type == "recurso_info"
+    assert t.blocker_note == "Preciso comprar tinta azul"
+
+
+def test_set_blocker_sem_nota_nao_altera_nota_existente(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+    t.blocker_note = "Nota anterior"
+    svc.flush()
+
+    task_service.set_blocker(t.id, "vaga_grande")  # sem note=
+    svc.refresh(t)
+
+    assert t.blocker_note == "Nota anterior"  # não foi apagada
+
+
+def test_set_blocker_note_atualiza_nota(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+
+    task_service.set_blocker_note(t.id, "  Nota com espaços  ")
+    svc.refresh(t)
+
+    assert t.blocker_note == "Nota com espaços"
+
+
+def test_set_blocker_note_tarefa_inexistente_retorna_none(svc):
+    assert task_service.set_blocker_note(uuid.uuid4(), "nota") is None
+
+
+def test_set_blocked_by_task_vincula_e_coloca_aguardando(svc):
+    user = _user(svc)
+    bloqueadora = _task(svc, user, title="Tarefa bloqueadora")
+    bloqueada = _task(svc, user, title="Tarefa bloqueada")
+
+    task_service.set_blocked_by_task(bloqueada.id, bloqueadora.id)
+    svc.refresh(bloqueada)
+
+    assert bloqueada.blocked_by_task_id == bloqueadora.id
+    assert bloqueada.status == "aguardando"
+    assert bloqueada.blocker_type == "tarefa_bloqueadora"
+    assert bloqueada.waiting_since is not None
+
+
+def test_set_blocked_by_task_tarefa_inexistente_retorna_none(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+    assert task_service.set_blocked_by_task(t.id, uuid.uuid4()) is None
+    assert task_service.set_blocked_by_task(uuid.uuid4(), t.id) is None
+
+
+def test_complete_task_auto_unblock_dependente(svc):
+    user = _user(svc)
+    bloqueadora = _task(svc, user, title="Comprar material")
+    bloqueada = _task(svc, user, title="Pintar o quarto")
+
+    task_service.set_blocked_by_task(bloqueada.id, bloqueadora.id)
+    svc.refresh(bloqueada)
+    assert bloqueada.status == "aguardando"
+
+    unblocked = task_service.complete_task(bloqueadora.id)
+
+    svc.refresh(bloqueada)
+    assert bloqueada.status == "aberta"
+    assert bloqueada.blocked_by_task_id is None
+    assert bloqueada.blocker_type is None
+    assert "Pintar o quarto" in unblocked
+
+
+def test_complete_task_auto_unblock_multiplos_dependentes(svc):
+    user = _user(svc)
+    bloqueadora = _task(svc, user, title="Bloqueadora")
+    dep1 = _task(svc, user, title="Dependente 1")
+    dep2 = _task(svc, user, title="Dependente 2")
+
+    task_service.set_blocked_by_task(dep1.id, bloqueadora.id)
+    task_service.set_blocked_by_task(dep2.id, bloqueadora.id)
+
+    unblocked = task_service.complete_task(bloqueadora.id)
+
+    assert len(unblocked) == 2
+    assert "Dependente 1" in unblocked
+    assert "Dependente 2" in unblocked
+    svc.refresh(dep1)
+    svc.refresh(dep2)
+    assert dep1.status == "aberta"
+    assert dep2.status == "aberta"
+
+
+def test_complete_task_sem_dependentes_retorna_lista_vazia(svc):
+    user = _user(svc)
+    t = _task(svc, user)
+
+    unblocked = task_service.complete_task(t.id)
+
+    assert unblocked == []
+
+
+def test_unblock_task_limpa_blocked_by_task_id(svc):
+    user = _user(svc)
+    bloqueadora = _task(svc, user, title="Bloqueadora")
+    bloqueada = _task(svc, user, title="Bloqueada")
+    task_service.set_blocked_by_task(bloqueada.id, bloqueadora.id)
+
+    task_service.unblock_task(bloqueada.id)
+    svc.refresh(bloqueada)
+
+    assert bloqueada.blocked_by_task_id is None
+    assert bloqueada.status == "aberta"
+    assert bloqueada.blocker_type is None
+
+
+def test_get_pending_tasks_for_selection_exclui_tarefa_atual(svc):
+    user = _user(svc)
+    t1 = _task(svc, user, title="T1")
+    t2 = _task(svc, user, title="T2")
+    t3 = _task(svc, user, title="T3")
+
+    result = task_service.get_pending_tasks_for_selection(user.telegram_chat_id, t1.id)
+
+    ids = [t.id for t in result]
+    assert t1.id not in ids
+    assert t2.id in ids
+    assert t3.id in ids
+
+
+def test_get_pending_tasks_for_selection_nao_retorna_concluidas(svc):
+    user = _user(svc)
+    t1 = _task(svc, user, title="Aberta")
+    t2 = _task(svc, user, title="Concluída", status="concluida")
+    excluida = _task(svc, user, title="Excluída")
+
+    result = task_service.get_pending_tasks_for_selection(user.telegram_chat_id, excluida.id)
+
+    ids = [t.id for t in result]
+    assert t1.id in ids
+    assert t2.id not in ids

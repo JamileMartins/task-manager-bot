@@ -24,9 +24,13 @@ from src.handlers.blocker import (
     cb_blocker_cobrar_date,
     cb_blocker_data_date,
     cb_blocker_decidir_ok,
+    cb_blocker_dep_page,
+    cb_blocker_dep_pick,
     cb_blocker_keep,
     cb_blocker_next_step_ok,
     cb_blocker_next_step_retry,
+    cb_blocker_nota_skip,
+    cb_blocker_nota_start,
     cb_blocker_recurso_ok,
     cb_blocker_start,
     cb_blocker_type,
@@ -65,6 +69,7 @@ from src.handlers.agora import (
     cb_agora_concluir,
     cb_agora_energia,
     cb_agora_outra,
+    cb_agora_pular,
     cb_agora_tempo,
     cmd_agora,
 )
@@ -239,6 +244,10 @@ def _register_handlers(app: Application) -> None:
     app.add_handler(CallbackQueryHandler(cb_blocker_data_date, pattern=r"^blk_dd:"))
     app.add_handler(CallbackQueryHandler(cb_blocker_archive, pattern=r"^blk_arc:"))
     app.add_handler(CallbackQueryHandler(cb_blocker_keep, pattern=r"^blk_keep:"))
+    app.add_handler(CallbackQueryHandler(cb_blocker_nota_start, pattern=r"^blk_nota_s:"))
+    app.add_handler(CallbackQueryHandler(cb_blocker_nota_skip, pattern=r"^blk_nota_skip:"))
+    app.add_handler(CallbackQueryHandler(cb_blocker_dep_pick, pattern=r"^blk_dep:"))
+    app.add_handler(CallbackQueryHandler(cb_blocker_dep_page, pattern=r"^blk_tp:"))
     app.add_handler(CallbackQueryHandler(cb_unblock, pattern=r"^unblock:"))
 
     # Revisão semanal
@@ -282,6 +291,7 @@ def _register_handlers(app: Application) -> None:
     app.add_handler(CallbackQueryHandler(cb_agora_energia, pattern=r"^ag_e:"))
     app.add_handler(CallbackQueryHandler(cb_agora_concluir, pattern=r"^ag_ok:"))
     app.add_handler(CallbackQueryHandler(cb_agora_outra, pattern=r"^ag_nx:"))
+    app.add_handler(CallbackQueryHandler(cb_agora_pular, pattern=r"^ag_pular:"))
     app.add_handler(CallbackQueryHandler(cb_agora_adiar, pattern=r"^ag_ad:"))
     app.add_handler(CallbackQueryHandler(cb_agora_adiar_date, pattern=r"^ag_adf:"))
 
