@@ -1294,9 +1294,10 @@ def msg_progresso(projetos) -> str:
         lines.append(f"  {barra} {pct} · {p.open_count} abertas · toque {toque}")
 
         if p.is_couple:
+            eu_label = p.user_name or "Eu"
             par_label = p.partner_name or "Par"
             lines.append(
-                f"  👤 Meu: {p.couple_mine}  "
+                f"  👤 {eu_label}: {p.couple_mine}  "
                 f"👤 {par_label}: {p.couple_partner}  "
                 f"💑 Dos dois: {p.couple_joint}  "
                 f"🏷️ Sem dono: {p.couple_unowned}"

@@ -324,6 +324,7 @@ class ProjetoInfo:
     couple_joint: int = 0
     couple_unowned: int = 0
     partner_name: Optional[str] = None
+    user_name: Optional[str] = None
 
 
 def get_user_lists(chat_id: int) -> list[ListInfo]:
@@ -1849,6 +1850,7 @@ def get_progresso(chat_id: int) -> list[ProjetoInfo]:
                 couple_joint=joint,
                 couple_unowned=unowned,
                 partner_name=partner_name,
+                user_name=user.name.split()[0],
             ))
 
         return resultado
