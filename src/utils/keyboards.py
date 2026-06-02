@@ -226,6 +226,12 @@ def kb_task_detail(task: Task, listas: list[dict], subtasks=None, show_couple: b
             InlineKeyboardButton("📅 Amanhã", callback_data=f"task_d:{task.id}:amanha"),
             InlineKeyboardButton("🚫 Sem prazo", callback_data=f"task_d:{task.id}:none"),
         ])
+        rows.append([
+            InlineKeyboardButton("+3 dias", callback_data=f"task_dd:{task.id}:3"),
+            InlineKeyboardButton("+1 sem", callback_data=f"task_dd:{task.id}:7"),
+            InlineKeyboardButton("+1 mês", callback_data=f"task_dd:{task.id}:30"),
+            InlineKeyboardButton("📅 Digitar...", callback_data=f"task_dc:{task.id}"),
+        ])
 
         r_row = []
         for val, label in [("daily", "🔁 Diária"), ("weekly", "🔁 Semanal"), ("monthly", "🔁 Mensal"), (None, "🚫 Sem rep.")]:

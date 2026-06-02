@@ -16,6 +16,8 @@ from src.handlers import notify
 from src.services import task_service
 from src.utils import keyboards, textos
 
+import re
+
 logger = logging.getLogger(__name__)
 
 _MOVE_TASK_KEY = "move_task_id"
@@ -23,6 +25,42 @@ _MOVE_LISTAS_KEY = "move_listas"
 _HAS_COUPLE_KEY = "detail_has_couple"
 _NOTE_TASK_KEY = "note_task_id"
 _TITLE_TASK_KEY = "title_task_id"
+_DUE_CUSTOM_KEY = "due_custom_task_id"
+
+
+def _parse_date_ptbr(text: str, tz_name: str = DEFAULT_TIMEZONE) -> datetime | None:
+    """Faz parse de datas em PT-BR. Exemplos aceitos:
+    20/07 · 20/07/2026 · 20/07 às 14:00 · 20/07/2026 14:30
+    """
+    tz = pytz.timezone(tz_name)
+    now = datetime.now(tz)
+    text = text.strip().replace("às ", "").replace(" às", "").replace("  ", " ")
+
+    # (dd/mm/yyyy HH:MM) ou (dd/mm/yyyy)
+    m = re.search(r"(\d{1,2})/(\d{1,2})/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?", text)
+    if m:
+        d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        h, mi = (int(m.group(4)), int(m.group(5))) if m.group(4) else (9, 0)
+        try:
+            return tz.localize(datetime(y, mo, d, h, mi))
+        except ValueError:
+            return None
+
+    # (dd/mm HH:MM) ou (dd/mm)
+    m = re.search(r"(\d{1,2})/(\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?", text)
+    if m:
+        d, mo = int(m.group(1)), int(m.group(2))
+        h, mi = (int(m.group(3)), int(m.group(4))) if m.group(3) else (9, 0)
+        year = now.year
+        try:
+            dt = tz.localize(datetime(year, mo, d, h, mi))
+            if dt < now:
+                dt = tz.localize(datetime(year + 1, mo, d, h, mi))
+            return dt
+        except ValueError:
+            return None
+
+    return None
 _SHOW_CATEGORY_KEY = "detail_show_category"
 
 _NOTE_TEXT = 1
@@ -180,12 +218,19 @@ async def cb_task_assign(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 # Editar quadrante (US-08)
 # ---------------------------------------------------------------------------
 
+_QUADRANT_TOOLTIP = {
+    "1": "Q1 — Urgente e importante: fazer agora",
+    "2": "Q2 — Importante, sem urgência: planejar",
+    "3": "Q3 — Urgente, pouco importante: delegar ou fazer rápido",
+    "4": "Q4 — Nem urgente nem importante: eliminar ou fazer no tempo livre",
+}
+
 async def cb_task_set_quadrant(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    await query.answer()
+    _, task_id_str, q_str = query.data.split(":")
+    await query.answer(_QUADRANT_TOOLTIP.get(q_str, ""))
     if not is_authorized(update):
         return
-    _, task_id_str, q_str = query.data.split(":")
     task_id = uuid.UUID(task_id_str)
     await asyncio.to_thread(task_service.update_task_attrs, task_id, quadrant=int(q_str))
     await _refresh_detail(query, task_id, context)
@@ -195,23 +240,37 @@ async def cb_task_set_quadrant(update: Update, context: ContextTypes.DEFAULT_TYP
 # Editar energia e estimativa (US-10)
 # ---------------------------------------------------------------------------
 
+_ENERGY_TOOLTIP = {
+    "alta": "⚡ Alta — exige foco total; reserve um bom momento",
+    "media": "🔋 Média — concentração normal",
+    "baixa": "🪫 Baixa — dá pra fazer no piloto automático",
+}
+
 async def cb_task_set_energy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    await query.answer()
+    parts = query.data.split(":")
+    await query.answer(_ENERGY_TOOLTIP.get(parts[2], ""))
     if not is_authorized(update):
         return
-    parts = query.data.split(":")
     task_id = uuid.UUID(parts[1])
     await asyncio.to_thread(task_service.update_task_attrs, task_id, energy=parts[2])
     await _refresh_detail(query, task_id, context)
 
 
+_ESTIMATE_TOOLTIP = {
+    "5": "5 min — tarefa relâmpago",
+    "15": "15 min — tarefa curta",
+    "30": "30 min — meia hora",
+    "60": "1 hora",
+    "120": "2 horas ou mais",
+}
+
 async def cb_task_set_estimate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    await query.answer()
+    parts = query.data.split(":")
+    await query.answer(_ESTIMATE_TOOLTIP.get(parts[2], ""))
     if not is_authorized(update):
         return
-    parts = query.data.split(":")
     task_id = uuid.UUID(parts[1])
     await asyncio.to_thread(task_service.update_task_attrs, task_id, estimate_min=int(parts[2]))
     await _refresh_detail(query, task_id, context)
@@ -260,12 +319,73 @@ async def cb_task_set_due(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 # ---------------------------------------------------------------------------
+# Prazo: presets de dias e data digitada (v1.20.0)
+# ---------------------------------------------------------------------------
+
+async def cb_task_due_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Define prazo como 'hoje + N dias' (callbacks task_dd:{id}:{days})."""
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+    parts = query.data.split(":")
+    task_id = uuid.UUID(parts[1])
+    days = int(parts[2])
+    tz = pytz.timezone(DEFAULT_TIMEZONE)
+    due = (datetime.now(tz) + timedelta(days=days)).replace(hour=9, minute=0, second=0, microsecond=0)
+    await asyncio.to_thread(task_service.update_task_attrs, task_id, due_at=due)
+    await _refresh_detail(query, task_id, context)
+
+
+async def cb_task_due_custom_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Pede ao usuário que digite a data desejada."""
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+    task_id_str = query.data.split(":")[1]
+    context.user_data[_DUE_CUSTOM_KEY] = task_id_str
+    await query.edit_message_text(
+        "📅 Que data? Manda no formato:\n\n"
+        "  20/07\n"
+        "  20/07/2026\n"
+        "  20/07 às 14:00\n"
+        "  20/07/2026 14:00"
+    )
+
+
+async def handle_task_due_custom_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Intercepta texto quando aguardando data digitada. Retorna True se consumiu a mensagem."""
+    task_id_str = context.user_data.get(_DUE_CUSTOM_KEY)
+    if not task_id_str:
+        return False
+    text = (update.message.text or "").strip()
+    if not text:
+        return False
+    context.user_data.pop(_DUE_CUSTOM_KEY, None)
+    due = _parse_date_ptbr(text)
+    if due is None:
+        await update.message.reply_text(
+            "Não entendi essa data 😕\n"
+            "Tenta assim: 20/07, 20/07/2026 ou 20/07 às 14:00"
+        )
+        context.user_data[_DUE_CUSTOM_KEY] = task_id_str  # mantém estado
+        return True
+    task_id = uuid.UUID(task_id_str)
+    await asyncio.to_thread(task_service.update_task_attrs, task_id, due_at=due)
+    tz = pytz.timezone(DEFAULT_TIMEZONE)
+    fmt = due.astimezone(tz).strftime("%d/%m/%Y às %H:%M")
+    await update.message.reply_text(f"📅 Prazo definido para {fmt} ✅")
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Mover tarefa entre listas (US-07)
 # ---------------------------------------------------------------------------
 
 async def cb_task_start_move(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    await query.answer()
+    await query.answer("📂 Escolha a lista destino")
     if not is_authorized(update):
         return
 
@@ -390,11 +510,12 @@ async def cb_task_move_force(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def cb_task_reorder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    await query.answer()
-    if not is_authorized(update):
-        return
     parts = query.data.split(":")
     direction = "up" if parts[0] == "task_up" else "down"
+    tip = "⬆️ Moveu para cima na lista" if direction == "up" else "⬇️ Moveu para baixo na lista"
+    await query.answer(tip)
+    if not is_authorized(update):
+        return
     task_id = uuid.UUID(parts[1])
     await asyncio.to_thread(task_service.reorder_task, task_id, direction)
     await _refresh_detail(query, task_id, context)

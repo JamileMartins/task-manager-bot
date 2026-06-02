@@ -12,6 +12,7 @@ from telegram.ext import ContextTypes
 from src.handlers.common import deny_unauthorized, is_authorized
 from src.handlers import notify
 from src.handlers.blocker import handle_blocker_note_text
+from src.handlers.task_detail import handle_task_due_custom_text
 from src.services import ai_service, task_service
 from src.utils import keyboards, textos
 
@@ -113,8 +114,10 @@ async def handle_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not text:
         return
 
-    # Nota de impedimento tem prioridade sobre brain dump
+    # Interceptores com prioridade sobre brain dump
     if await handle_blocker_note_text(update, context):
+        return
+    if await handle_task_due_custom_text(update, context):
         return
 
     await update.message.reply_chat_action(ChatAction.TYPING)

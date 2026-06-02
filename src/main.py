@@ -138,6 +138,8 @@ from src.handlers.task_detail import (
     cb_task_move_force,
     cb_task_move_to,
     cb_task_reorder,
+    cb_task_due_custom_start,
+    cb_task_due_days,
     cb_task_set_due,
     cb_task_set_energy,
     cb_task_set_estimate,
@@ -312,6 +314,8 @@ def _register_handlers(app: Application) -> None:
     app.add_handler(CallbackQueryHandler(cb_task_set_energy, pattern=r"^task_e:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_estimate, pattern=r"^task_m:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_due, pattern=r"^task_d:"))
+    app.add_handler(CallbackQueryHandler(cb_task_due_days, pattern=r"^task_dd:"))
+    app.add_handler(CallbackQueryHandler(cb_task_due_custom_start, pattern=r"^task_dc:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_recurrence, pattern=r"^task_rec:"))
     app.add_handler(CallbackQueryHandler(cb_task_start_move, pattern=r"^task_list:"))
     app.add_handler(CallbackQueryHandler(cb_task_move_to, pattern=r"^mv:"))
