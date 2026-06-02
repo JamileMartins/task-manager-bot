@@ -46,6 +46,7 @@ MSG_AJUDA = (
     "   /casal_convidar · /casal_entrar <código> · /casal_status\n"
     "🔍 /buscar <palavra> — achar uma tarefa\n"
     "🏆 /conquistas — ver o que você concluiu na semana\n"
+    "🔗 /ordem — cadeias de dependência em ordem de execução\n"
     "📤 /exportar — todas as tarefas abertas em texto\n"
     "🍅 /foco [min] [descanso] — iniciar um pomodoro (padrão 50+15)\n"
     "⏸️ /pausar [dias] — silenciar resumos e lembretes por N dias\n"
@@ -329,7 +330,7 @@ _BLOCKER_LABEL: dict[str, str] = {
 }
 
 
-def msg_task_detail(task, subtasks=None) -> str:
+def msg_task_detail(task, subtasks=None, blocking_task=None, blocked_dependents=None) -> str:
     import pytz
     lista_nome = task.task_list.name if task.task_list else "📥 Inbox"
     lines = [f"📋 {task.title}\n", f"📂 {lista_nome}"]
@@ -358,6 +359,15 @@ def msg_task_detail(task, subtasks=None) -> str:
         lines.append(f"\n⏳ Aguardando — {blocker_label}")
     elif task.blocker_type:
         lines.append(f"\n⚠️ Travada: {_BLOCKER_LABEL.get(task.blocker_type, task.blocker_type)}")
+
+    if task.blocker_note:
+        lines.append(f"📝 {task.blocker_note}")
+
+    if blocking_task is not None:
+        lines.append(f"⛔ Bloqueada por: {blocking_task.title}")
+    if blocked_dependents:
+        nomes = ", ".join(d.title for d in blocked_dependents)
+        lines.append(f"🔓 Desbloqueia: {nomes}")
 
     _CAT_LABEL = {"medicacao": "💊 Medicação", "agendamento": "📅 Agendamento"}
     if task.category and task.category in _CAT_LABEL:
@@ -535,6 +545,36 @@ def msg_auto_unblock(title: str) -> str:
 MSG_AGORA_TRAVADA = "Tudo bem. O que está travando essa tarefa?"
 
 MSG_AGORA_PULAR_MESMO = "Pular sem registrar"
+
+
+# ---------------------------------------------------------------------------
+# /ordem — cadeias de dependência (v1.18.0)
+# ---------------------------------------------------------------------------
+
+MSG_ORDEM_VAZIA = (
+    "Nenhuma cadeia de dependência encontrada 🔓\n\n"
+    "Quando você vincular tarefas com *Depende de outra tarefa*, "
+    "elas aparecem aqui em ordem de execução."
+)
+
+
+def msg_ordem_header(n_chains: int, n_ready: int) -> str:
+    pronto = "1 pronta pra começar" if n_ready == 1 else f"{n_ready} prontas pra começar"
+    return (
+        f"📋 *Ordem de execução* — {n_chains} {'cadeia' if n_chains == 1 else 'cadeias'}\n"
+        f"▶ {pronto}"
+    )
+
+
+# --- Contexto de dependência no detalhe da tarefa ---
+
+def msg_bloqueada_por(title: str) -> str:
+    return f"⛔ Bloqueada por: _{title}_"
+
+
+def msg_desbloqueia(titles: list[str]) -> str:
+    lista = ", ".join(f"_{t}_" for t in titles)
+    return f"🔓 Desbloqueia: {lista}"
 
 
 # ---------------------------------------------------------------------------

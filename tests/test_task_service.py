@@ -2645,3 +2645,94 @@ def test_get_pending_tasks_for_selection_nao_retorna_concluidas(svc):
     ids = [t.id for t in result]
     assert t1.id in ids
     assert t2.id not in ids
+
+
+# ---------------------------------------------------------------------------
+# get_dependency_chains (v1.18.0)
+# ---------------------------------------------------------------------------
+
+def test_chains_sem_dependencias_retorna_vazio(svc):
+    user = _user(svc)
+    _task(svc, user, title="Tarefa sem dependência")
+
+    result = task_service.get_dependency_chains(user.telegram_chat_id)
+
+    assert result == []
+
+
+def test_chains_cadeia_simples(svc):
+    user = _user(svc)
+    bloqueadora = _task(svc, user, title="Comprar tinta")
+    bloqueada = _task(svc, user, title="Pintar o quarto")
+    task_service.set_blocked_by_task(bloqueada.id, bloqueadora.id)
+
+    chains = task_service.get_dependency_chains(user.telegram_chat_id)
+
+    assert len(chains) == 1
+    # ordem: objetivo (bloqueada) → fazer agora (bloqueadora)
+    assert chains[0][0].id == bloqueada.id
+    assert chains[0][1].id == bloqueadora.id
+
+
+def test_chains_cadeia_tres_niveis(svc):
+    user = _user(svc)
+    t1 = _task(svc, user, title="Ir ao banco")           # fazer agora
+    t2 = _task(svc, user, title="Comprar material")      # intermediária
+    t3 = _task(svc, user, title="Montar estante")        # objetivo final
+
+    task_service.set_blocked_by_task(t3.id, t2.id)  # montar ← comprar
+    task_service.set_blocked_by_task(t2.id, t1.id)  # comprar ← banco
+
+    chains = task_service.get_dependency_chains(user.telegram_chat_id)
+
+    assert len(chains) == 1
+    chain = chains[0]
+    assert len(chain) == 3
+    assert chain[0].id == t3.id   # objetivo (sem indent)
+    assert chain[1].id == t2.id   # intermediária
+    assert chain[2].id == t1.id   # fazer agora (mais indentada)
+
+
+def test_chains_duas_cadeias_independentes(svc):
+    user = _user(svc)
+    a1 = _task(svc, user, title="A1 bloqueadora")
+    a2 = _task(svc, user, title="A2 bloqueada")
+    b1 = _task(svc, user, title="B1 bloqueadora")
+    b2 = _task(svc, user, title="B2 bloqueada")
+
+    task_service.set_blocked_by_task(a2.id, a1.id)
+    task_service.set_blocked_by_task(b2.id, b1.id)
+
+    chains = task_service.get_dependency_chains(user.telegram_chat_id)
+
+    assert len(chains) == 2
+    chain_ids = [{c.id for c in chain} for chain in chains]
+    assert {a1.id, a2.id} in chain_ids
+    assert {b1.id, b2.id} in chain_ids
+
+
+def test_chains_usuario_sem_tarefas_retorna_vazio(svc):
+    user = _user(svc)
+    assert task_service.get_dependency_chains(user.telegram_chat_id) == []
+
+
+def test_chains_usuario_inexistente_retorna_vazio(svc):
+    assert task_service.get_dependency_chains(99999) == []
+
+
+def test_chains_ignora_tarefas_concluidas(svc):
+    user = _user(svc)
+    bloqueadora = _task(svc, user, title="Concluída", status="concluida")
+    bloqueada = _task(svc, user, title="Bloqueada")
+    task_service.set_blocked_by_task(bloqueada.id, bloqueadora.id)
+
+    chains = task_service.get_dependency_chains(user.telegram_chat_id)
+
+    # bloqueadora está concluída → sai do task_map → bloqueada aparece como chain de 1 (apenas ela)
+    # ou como vazio se ela própria não é raiz de exibição
+    # Na prática: bloqueada tem blocked_by_task_id, mas a bloqueadora não está no task_map
+    # → a cadeia termina em bloqueada[0] e bloqueadora não entra
+    assert all(len(c) >= 1 for c in chains)
+    # bloqueadora não aparece na chain
+    all_ids = {t.id for chain in chains for t in chain}
+    assert bloqueadora.id not in all_ids

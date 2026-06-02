@@ -82,6 +82,7 @@ from src.handlers.capture import (
     handle_capture,
 )
 from src.handlers.common import (
+    cb_noop,
     cmd_ajuda,
     cmd_amanha,
     cmd_buscar,
@@ -126,6 +127,7 @@ from src.handlers.couple import (
     cmd_casal_status,
 )
 from src.handlers.medicacoes import cmd_medicacoes, medicacoes_conversation
+from src.handlers.ordem import cmd_ordem
 from src.handlers.task_detail import (
     cb_sub_complete,
     cb_task_assign,
@@ -224,6 +226,8 @@ def _register_handlers(app: Application) -> None:
     app.add_handler(CommandHandler("retomar", cmd_retomar))
     app.add_handler(CommandHandler("foco", cmd_foco))
     app.add_handler(CommandHandler("parar_foco", cmd_parar_foco))
+    app.add_handler(CommandHandler("ordem", cmd_ordem))
+    app.add_handler(CallbackQueryHandler(cb_noop, pattern=r"^noop$"))
 
     # ConversationHandlers (antes do capture handler)
     app.add_handler(title_conversation)

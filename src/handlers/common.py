@@ -410,6 +410,12 @@ async def cmd_projetos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 # Error handler global
 # ---------------------------------------------------------------------------
 
+async def cb_noop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Callback sem ação — usado em botões decorativos (ex: cabeçalho de cadeia em /ordem)."""
+    if update.callback_query:
+        await update.callback_query.answer()
+
+
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     error_name = type(context.error).__name__
     logger.error("Exceção não tratada [%s]: %s", error_name, context.error, exc_info=context.error)

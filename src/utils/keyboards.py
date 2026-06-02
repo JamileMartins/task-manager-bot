@@ -65,13 +65,18 @@ def kb_confirmar_arquivar(list_id: uuid.UUID) -> InlineKeyboardMarkup:
 # Tarefas
 # ---------------------------------------------------------------------------
 
+def _task_label(task: Task, max_len: int = 32) -> str:
+    prefix = "🔒 " if task.blocked_by_task_id else ""
+    title = task.title if len(task.title) <= max_len else task.title[:max_len - 1] + "…"
+    return f"{prefix}{title}"
+
+
 def kb_tasks(tasks: Sequence[Task], list_id: uuid.UUID | None = None) -> InlineKeyboardMarkup:
     """Título da tarefa (→ detalhe) + ✅ por linha."""
     rows = []
     for task in tasks:
-        title = task.title[:32] + "…" if len(task.title) > 32 else task.title
         rows.append([
-            InlineKeyboardButton(title, callback_data=f"task_dt:{task.id}"),
+            InlineKeyboardButton(_task_label(task), callback_data=f"task_dt:{task.id}"),
             InlineKeyboardButton("✅", callback_data=f"complete_task:{task.id}"),
         ])
     nav_row = [InlineKeyboardButton("← Voltar", callback_data="back_to_lists")]
@@ -161,12 +166,11 @@ def kb_tudo_group(tasks: Sequence[Task]) -> InlineKeyboardMarkup:
     """Keyboard para um grupo do /tudo — ✅ apenas para tarefas abertas; ⏳ sem botão para aguardando."""
     rows = []
     for task in tasks:
-        title = task.title[:32] + "…" if len(task.title) > 32 else task.title
         if task.status == "aguardando":
-            rows.append([InlineKeyboardButton(f"⏳ {title}", callback_data=f"task_dt:{task.id}")])
+            rows.append([InlineKeyboardButton(f"⏳ {_task_label(task)}", callback_data=f"task_dt:{task.id}")])
         else:
             rows.append([
-                InlineKeyboardButton(title, callback_data=f"task_dt:{task.id}"),
+                InlineKeyboardButton(_task_label(task), callback_data=f"task_dt:{task.id}"),
                 InlineKeyboardButton("✅", callback_data=f"complete_task:{task.id}"),
             ])
     return InlineKeyboardMarkup(rows)
@@ -176,9 +180,8 @@ def kb_inbox(tasks: Sequence[Task]) -> InlineKeyboardMarkup:
     """Título da tarefa (→ detalhe) + ✅ por linha para a Inbox."""
     rows = []
     for task in tasks:
-        title = task.title[:32] + "…" if len(task.title) > 32 else task.title
         rows.append([
-            InlineKeyboardButton(title, callback_data=f"task_dt:{task.id}"),
+            InlineKeyboardButton(_task_label(task), callback_data=f"task_dt:{task.id}"),
             InlineKeyboardButton("✅", callback_data=f"complete_task:{task.id}"),
         ])
     rows.append([InlineKeyboardButton("← Voltar", callback_data="back_to_lists")])
@@ -625,3 +628,37 @@ def kb_foco_break_done(work_min: int, break_min: int) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(f"🔄 Mais um ciclo ({work_min}min)", callback_data=f"foco_ciclo:{work_min}:{break_min}")],
         [InlineKeyboardButton("✅ Encerrar", callback_data="foco_encerrar")],
     ])
+
+
+# ---------------------------------------------------------------------------
+# /ordem — cadeias de dependência (v1.18.0)
+# ---------------------------------------------------------------------------
+
+_INDENT = "   "  # 3 espaços por nível de indentação
+_MAX_TITLE = 36  # caracteres visíveis no botão
+
+
+def _chain_button_label(task: Task, depth: int, is_ready: bool) -> str:
+    icon = "▶" if is_ready else "🔒"
+    indent = _INDENT * depth
+    title = task.title if len(task.title) <= _MAX_TITLE else task.title[:_MAX_TITLE - 1] + "…"
+    return f"{indent}{icon} {title}"
+
+
+def kb_ordem(chains: list[list[Task]]) -> InlineKeyboardMarkup:
+    """Teclado para /ordem: uma linha por tarefa, indentação por nível.
+
+    Cada cadeia exibe do objetivo final (índice 0, sem indentação) até a tarefa
+    que pode ser feita agora (último índice, mais indentada).
+    Separadores de cadeia são botões não-funcionais com o número da cadeia.
+    """
+    rows: list[list[InlineKeyboardButton]] = []
+    for i, chain in enumerate(chains, start=1):
+        rows.append([
+            InlineKeyboardButton(f"🔗 Cadeia {i}", callback_data="noop"),
+        ])
+        for depth, task in enumerate(chain):
+            is_ready = (depth == len(chain) - 1)
+            label = _chain_button_label(task, depth, is_ready)
+            rows.append([InlineKeyboardButton(label, callback_data=f"task_dt:{task.id}")])
+    return InlineKeyboardMarkup(rows)

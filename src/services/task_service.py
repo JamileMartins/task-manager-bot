@@ -1104,6 +1104,65 @@ def get_pending_tasks_for_selection(
         ).all()
 
 
+def get_dependency_chains(chat_id: int) -> list[list[Task]]:
+    """Retorna cadeias de dependência do usuário em ordem de exibição.
+
+    Cada cadeia é uma lista de tarefas do objetivo final (índice 0, sem indentação)
+    até a tarefa que pode ser feita agora (último índice, mais indentada).
+    Apenas tarefas com relação blocked_by_task_id aparecem.
+    Detecta ciclos e os ignora silenciosamente.
+    """
+    with get_session() as session:
+        user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
+        if user is None:
+            return []
+
+        # Todas as tarefas não-concluídas do usuário
+        all_tasks: list[Task] = session.scalars(
+            select(Task).where(
+                Task.user_id == user.id,
+                Task.status.notin_(["concluida", "arquivada"]),
+            )
+        ).all()
+
+        task_map: dict[uuid.UUID, Task] = {t.id: t for t in all_tasks}
+
+        # Tarefas que estão bloqueadas (têm blocked_by_task_id)
+        blocked_tasks = [t for t in all_tasks if t.blocked_by_task_id is not None]
+        if not blocked_tasks:
+            return []
+
+        # IDs dos bloqueadores diretos
+        blocking_ids: set[uuid.UUID] = {
+            t.blocked_by_task_id for t in blocked_tasks if t.blocked_by_task_id is not None
+        }
+
+        # Raízes de exibição = tarefas bloqueadas que ninguém mais aguarda
+        # (seu id NÃO aparece como blocked_by_task_id de nenhuma outra tarefa)
+        blocked_task_ids = {t.id for t in blocked_tasks}
+        display_roots = [t for t in blocked_tasks if t.id not in blocking_ids]
+
+        chains: list[list[Task]] = []
+        for root in display_roots:
+            chain: list[Task] = []
+            current: Optional[Task] = root
+            seen: set[uuid.UUID] = set()  # detecção de ciclo
+
+            while current is not None:
+                if current.id in seen:
+                    break  # ciclo detectado, interrompe
+                seen.add(current.id)
+                chain.append(current)
+
+                blocker_id = current.blocked_by_task_id
+                current = task_map.get(blocker_id) if blocker_id else None
+
+            if chain:
+                chains.append(chain)
+
+        return chains
+
+
 def set_waiting(task_id: str | uuid.UUID, *, due_at: Optional[datetime] = None) -> Optional[Task]:
     """Coloca a tarefa em status 'aguardando' e registra waiting_since."""
     uid = uuid.UUID(str(task_id)) if isinstance(task_id, str) else task_id

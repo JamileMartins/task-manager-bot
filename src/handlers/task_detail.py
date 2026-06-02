@@ -39,16 +39,22 @@ def _is_saude_task(task) -> bool:
 
 async def _refresh_detail(query, task_id: uuid.UUID, context: ContextTypes.DEFAULT_TYPE) -> None:
     listas = context.user_data.get(_MOVE_LISTAS_KEY, [])
-    task, subtasks = await asyncio.gather(
+    task, subtasks, dependents = await asyncio.gather(
         asyncio.to_thread(task_service.get_task_with_list, task_id),
         asyncio.to_thread(task_service.get_subtasks, task_id),
+        asyncio.to_thread(task_service.get_tasks_blocked_by, task_id),
     )
     if task is None:
         await query.edit_message_text(textos.MSG_ERRO_GENERICO)
         return
+    blocking_task = None
+    if task.blocked_by_task_id:
+        blocking_task = await asyncio.to_thread(
+            task_service.get_task_with_list, task.blocked_by_task_id
+        )
     show_category = context.user_data.get(_SHOW_CATEGORY_KEY, _is_saude_task(task))
     await query.edit_message_text(
-        textos.msg_task_detail(task, subtasks),
+        textos.msg_task_detail(task, subtasks, blocking_task=blocking_task, blocked_dependents=dependents),
         reply_markup=keyboards.kb_task_detail(
             task, listas, subtasks,
             show_couple=context.user_data.get(_HAS_COUPLE_KEY, False),
@@ -81,17 +87,23 @@ async def cb_task_detail(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     context.user_data[_HAS_COUPLE_KEY] = has_couple
 
     try:
-        task, subtasks = await asyncio.gather(
+        task, subtasks, dependents = await asyncio.gather(
             asyncio.to_thread(task_service.get_task_with_list, task_id),
             asyncio.to_thread(task_service.get_subtasks, task_id),
+            asyncio.to_thread(task_service.get_tasks_blocked_by, task_id),
         )
         if task is None:
             await query.edit_message_text(textos.MSG_ERRO_GENERICO)
             return
+        blocking_task = None
+        if task.blocked_by_task_id:
+            blocking_task = await asyncio.to_thread(
+                task_service.get_task_with_list, task.blocked_by_task_id
+            )
         show_category = _is_saude_task(task)
         context.user_data[_SHOW_CATEGORY_KEY] = show_category
         await query.edit_message_text(
-            textos.msg_task_detail(task, subtasks),
+            textos.msg_task_detail(task, subtasks, blocking_task=blocking_task, blocked_dependents=dependents),
             reply_markup=keyboards.kb_task_detail(
                 task, listas_dicts, subtasks,
                 show_couple=has_couple,
