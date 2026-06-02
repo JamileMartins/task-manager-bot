@@ -54,6 +54,8 @@ MSG_AJUDA = (
     "🏓 /ping — verificar se estou funcionando\n"
     "🔄 /reiniciar — reiniciar o bot\n\n"
     "📖 /quadrantes — o que significam Q1, Q2, Q3, Q4 e como uso a energia\n\n"
+    "😩 Impedimento — abra o detalhe de qualquer tarefa e toque em *Travada*. "
+    "Também aparece ao pular uma tarefa no /agora.\n\n"
     "Dica: você quase nunca precisa de comando. "
     "Só me manda o que vier na cabeça.\n\n"
     f"Task Manager v{__version__} · publicado em {__release_date__}"
