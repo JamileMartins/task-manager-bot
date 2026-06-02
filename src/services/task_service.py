@@ -318,6 +318,11 @@ class ProjetoInfo:
     open_count: int
     done_30d: int
     last_touch: Optional[datetime]
+    is_couple: bool = False
+    couple_mine: int = 0
+    couple_partner: int = 0
+    couple_joint: int = 0
+    couple_unowned: int = 0
 
 
 def get_user_lists(chat_id: int) -> list[ListInfo]:
@@ -1699,50 +1704,94 @@ def resume_bot(chat_id: int) -> None:
 
 
 # ---------------------------------------------------------------------------
-# /projetos — visão de progresso por lista (2e-7)
+# /progresso — visão de progresso por lista (v1.19.0, ex-/projetos)
 # ---------------------------------------------------------------------------
 
 def get_projetos(chat_id: int) -> list[ProjetoInfo]:
-    """Retorna progresso de cada lista ativa: tarefas abertas, concluídas (30d) e último toque."""
+    """Alias legado — use get_progresso."""
+    return get_progresso(chat_id)
+
+
+def get_progresso(chat_id: int) -> list[ProjetoInfo]:
+    """Retorna progresso de TODAS as listas ativas. Listas de casal incluem breakdown por dono."""
     with get_session() as session:
         user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
         if user is None:
             return []
+
         cutoff_30d = _now() - timedelta(days=30)
+
+        # Parceiro (se houver casal)
+        couple_id = _couple_id_for(session, user.id)
+        partner_user_id: Optional[uuid.UUID] = None
+        if couple_id is not None:
+            partner_user_id = session.scalar(
+                select(CoupleMember.user_id).where(
+                    CoupleMember.couple_id == couple_id,
+                    CoupleMember.user_id != user.id,
+                )
+            )
+
         lists = list(session.scalars(
             select(TaskList)
             .where(TaskList.user_id == user.id, TaskList.archived.is_(False))
             .order_by(TaskList.sort_order)
         ).all())
-        projetos: list[ProjetoInfo] = []
+
+        resultado: list[ProjetoInfo] = []
         for lst in lists:
+            base = Task.list_id == lst.id
             open_count = session.scalar(
                 select(func.count(Task.id)).where(
-                    Task.list_id == lst.id,
-                    Task.status == "aberta",
-                    Task.parent_task_id.is_(None),
+                    base, Task.status == "aberta", Task.parent_task_id.is_(None),
                 )
             ) or 0
             done_30d = session.scalar(
                 select(func.count(Task.id)).where(
-                    Task.list_id == lst.id,
-                    Task.status == "concluida",
-                    Task.completed_at >= cutoff_30d,
-                    Task.parent_task_id.is_(None),
+                    base, Task.status == "concluida",
+                    Task.completed_at >= cutoff_30d, Task.parent_task_id.is_(None),
                 )
             ) or 0
             last_touch = session.scalar(
-                select(func.max(Task.last_touched_at)).where(
-                    Task.list_id == lst.id,
-                    Task.status == "aberta",
-                )
+                select(func.max(Task.last_touched_at)).where(base, Task.status == "aberta")
             )
-            if open_count > 0 or done_30d > 0:
-                projetos.append(ProjetoInfo(
-                    name=lst.name,
-                    slug=lst.slug,
-                    open_count=open_count,
-                    done_30d=done_30d,
-                    last_touch=last_touch,
-                ))
-        return projetos
+
+            info = ProjetoInfo(
+                name=lst.name,
+                slug=lst.slug,
+                open_count=open_count,
+                done_30d=done_30d,
+                last_touch=last_touch,
+                is_couple=lst.is_couple,
+            )
+
+            if lst.is_couple and couple_id is not None:
+                couple_base = (base, Task.couple_id.isnot(None),
+                               Task.status.notin_(["concluida", "arquivada"]),
+                               Task.parent_task_id.is_(None))
+                info.couple_mine = session.scalar(
+                    select(func.count(Task.id)).where(
+                        *couple_base, Task.assigned_to == user.id
+                    )
+                ) or 0
+                info.couple_partner = session.scalar(
+                    select(func.count(Task.id)).where(
+                        *couple_base, Task.assigned_to == partner_user_id
+                    )
+                ) or 0 if partner_user_id else 0
+                info.couple_joint = session.scalar(
+                    select(func.count(Task.id)).where(
+                        *couple_base, Task.couple_joint.is_(True)
+                    )
+                ) or 0
+                info.couple_unowned = session.scalar(
+                    select(func.count(Task.id)).where(
+                        *couple_base,
+                        Task.assigned_to.is_(None),
+                        or_(Task.couple_joint.is_(None), Task.couple_joint.is_(False)),
+                    )
+                ) or 0
+
+            resultado.append(info)
+
+        return resultado

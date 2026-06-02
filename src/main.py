@@ -93,6 +93,7 @@ from src.handlers.common import (
     cmd_inbox,
     cmd_pausar,
     cmd_ping,
+    cmd_progresso,
     cmd_projetos,
     cmd_proximos,
     cmd_quadrantes,
@@ -171,7 +172,7 @@ _BOT_COMMANDS = [
     BotCommand("inbox",      "Caixa de entrada"),
     BotCommand("listas",     "Ver e gerenciar listas"),
     BotCommand("tudo",       "Todas as tarefas abertas"),
-    BotCommand("projetos",   "Progresso por lista"),
+    BotCommand("progresso",  "Progresso por lista"),
     BotCommand("conquistas", "Histórico de conclusões"),
     BotCommand("exportar",   "Tarefas abertas em texto"),
     BotCommand("foco",       "Iniciar pomodoro (padrão 50+15 min)"),
@@ -221,6 +222,7 @@ def _register_handlers(app: Application) -> None:
     app.add_handler(CommandHandler("conquistas", cmd_conquistas))
     app.add_handler(CommandHandler("exportar", cmd_exportar))
     app.add_handler(CommandHandler("proximos", cmd_proximos))
+    app.add_handler(CommandHandler("progresso", cmd_progresso))
     app.add_handler(CommandHandler("projetos", cmd_projetos))
     app.add_handler(CommandHandler("pausar", cmd_pausar))
     app.add_handler(CommandHandler("retomar", cmd_retomar))

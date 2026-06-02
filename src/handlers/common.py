@@ -388,10 +388,10 @@ async def cmd_retomar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 # ---------------------------------------------------------------------------
-# /projetos (2e-7)
+# /progresso (v1.19.0, ex-/projetos)
 # ---------------------------------------------------------------------------
 
-async def cmd_projetos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def cmd_progresso(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_authorized(update):
         await deny_unauthorized(update)
         return
@@ -399,11 +399,16 @@ async def cmd_projetos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not msg:
         return
     chat_id = update.effective_chat.id
-    projetos = await asyncio.to_thread(task_service.get_projetos, chat_id)
-    if not projetos:
-        await msg.reply_text(textos.MSG_PROJETOS_VAZIO)
+    dados = await asyncio.to_thread(task_service.get_progresso, chat_id)
+    if not dados:
+        await msg.reply_text(textos.MSG_PROGRESSO_VAZIO)
         return
-    await msg.reply_text(textos.msg_projetos(projetos))
+    await msg.reply_text(textos.msg_progresso(dados))
+
+
+async def cmd_projetos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Alias legado para /progresso."""
+    await cmd_progresso(update, context)
 
 
 # ---------------------------------------------------------------------------

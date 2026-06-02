@@ -41,7 +41,7 @@ MSG_AJUDA = (
     "☀️ /hoje — seus focos e prazos de hoje\n"
     "🌙 /amanha — o que tem prazo para amanhã\n"
     "📅 /proximos [N] — agenda dos próximos N dias (padrão 7)\n"
-    "📁 /projetos — progresso por lista\n"
+    "📊 /progresso — progresso por lista (e breakdown do casal)\n"
     "💞 /casal — tarefas compartilhadas com seu par\n"
     "   /casal_convidar · /casal_entrar <código> · /casal_status\n"
     "🔍 /buscar <palavra> — achar uma tarefa\n"
@@ -1235,9 +1235,11 @@ def msg_pausado(until_dt) -> str:
 # ---------------------------------------------------------------------------
 
 MSG_PROJETOS_VAZIO = (
-    "Nenhuma lista com tarefas ativas no momento 🎉\n"
-    "Tudo concluído ou ainda não começou."
+    "Nenhuma lista ainda 🗂️\n"
+    "Crie listas e adicione tarefas para ver o progresso aqui."
 )
+
+MSG_PROGRESSO_VAZIO = MSG_PROJETOS_VAZIO
 
 
 def _barra_progresso(done: int, total: int, width: int = 8) -> str:
@@ -1248,11 +1250,15 @@ def _barra_progresso(done: int, total: int, width: int = 8) -> str:
 
 
 def msg_projetos(projetos) -> str:
+    return msg_progresso(projetos)
+
+
+def msg_progresso(projetos) -> str:
     import pytz
     from datetime import timezone as _tz
     tz = pytz.timezone("America/Fortaleza")
 
-    lines = ["📁 Projetos\n"]
+    lines = ["📊 Progresso\n"]
     for p in projetos:
         total = p.open_count + p.done_30d
         barra = _barra_progresso(p.done_30d, total)
@@ -1269,6 +1275,15 @@ def msg_projetos(projetos) -> str:
         emoji = lista_emoji(p.slug or "")
         lines.append(f"{emoji} {p.name}")
         lines.append(f"  {barra} {pct} · {p.open_count} abertas · toque {toque}")
+
+        if p.is_couple:
+            lines.append(
+                f"  👤 Eu: {p.couple_mine}  "
+                f"👤 Par: {p.couple_partner}  "
+                f"💑 Dos dois: {p.couple_joint}  "
+                f"🏷️ Sem dono: {p.couple_unowned}"
+            )
+
         lines.append("")
 
     return "\n".join(lines).rstrip()

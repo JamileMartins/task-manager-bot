@@ -2373,22 +2373,21 @@ def test_is_paused_retorna_false_se_prazo_no_passado(svc):
 
 
 # ---------------------------------------------------------------------------
-# /projetos — get_projetos (2e-7)
+# /progresso — get_progresso (v1.19.0, ex-/projetos)
 # ---------------------------------------------------------------------------
 
-def test_get_projetos_retorna_lista_com_tarefas(svc):
+def test_get_progresso_retorna_lista_com_tarefas(svc):
     user = _user(svc)
     lst = _list(svc, user, name="Trabalho")
     _task(svc, user, list_id=lst.id, title="Tarefa aberta")
 
-    resultado = task_service.get_projetos(user.telegram_chat_id)
+    resultado = task_service.get_progresso(user.telegram_chat_id)
 
-    assert len(resultado) == 1
-    assert resultado[0].name == "Trabalho"
-    assert resultado[0].open_count == 1
+    match = next(p for p in resultado if p.name == "Trabalho")
+    assert match.open_count == 1
 
 
-def test_get_projetos_conta_concluidas_30d(svc):
+def test_get_progresso_conta_concluidas_30d(svc):
     user = _user(svc)
     lst = _list(svc, user, name="Projetos")
     t = _task(svc, user, list_id=lst.id, title="Concluida")
@@ -2396,7 +2395,7 @@ def test_get_projetos_conta_concluidas_30d(svc):
     t.completed_at = datetime.now(timezone.utc) - timedelta(days=5)
     svc.flush()
 
-    resultado = task_service.get_projetos(user.telegram_chat_id)
+    resultado = task_service.get_progresso(user.telegram_chat_id)
 
     match = next((p for p in resultado if p.name == "Projetos"), None)
     assert match is not None
@@ -2404,17 +2403,22 @@ def test_get_projetos_conta_concluidas_30d(svc):
     assert match.open_count == 0
 
 
-def test_get_projetos_ignora_lista_vazia(svc):
+def test_get_progresso_inclui_lista_vazia(svc):
     user = _user(svc)
     _list(svc, user, name="Lista Vazia")
 
-    resultado = task_service.get_projetos(user.telegram_chat_id)
+    resultado = task_service.get_progresso(user.telegram_chat_id)
 
-    assert not any(p.name == "Lista Vazia" for p in resultado)
+    assert any(p.name == "Lista Vazia" for p in resultado)
 
 
-def test_get_projetos_usuario_inexistente_retorna_vazio(svc):
-    assert task_service.get_projetos(999888) == []
+def test_get_progresso_usuario_inexistente_retorna_vazio(svc):
+    assert task_service.get_progresso(999888) == []
+
+
+def test_get_projetos_alias_legado(svc):
+    user = _user(svc)
+    assert task_service.get_projetos(user.telegram_chat_id) == task_service.get_progresso(user.telegram_chat_id)
 
 
 # ---------------------------------------------------------------------------
