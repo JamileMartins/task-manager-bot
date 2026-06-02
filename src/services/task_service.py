@@ -1740,7 +1740,13 @@ def get_progresso(chat_id: int) -> list[ProjetoInfo]:
 
         resultado: list[ProjetoInfo] = []
         for lst in lists:
-            base = Task.list_id == lst.id
+            # Listas de casal: stats baseados em couple_id (tarefas vivem em outras listas).
+            # Listas normais: stats baseados em list_id.
+            if lst.is_couple and couple_id is not None:
+                base = Task.couple_id == couple_id
+            else:
+                base = Task.list_id == lst.id
+
             open_count = session.scalar(
                 select(func.count(Task.id)).where(
                     base, Task.status == "aberta", Task.parent_task_id.is_(None),
