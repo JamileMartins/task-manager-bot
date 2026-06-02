@@ -59,6 +59,60 @@ _FS_B_RESP = (
     ']}'
 )
 
+_FS_C_USER = (
+    'Texto para classificar:\n"""\n'
+    "lavar roupa de cama, limpar o banheiro, tirar o lixo. "
+    "Adicionar filtro por energia no /agora e criar tela de estatísticas semanais.\n\"\"\""
+)
+_FS_C_RESP = (
+    '{"tarefas":['
+    '{"titulo":"Lavar roupa de cama","lista_sugerida":"Casa","quadrante_sugerido":3,'
+    '"prazo_sugerido":null,"estimativa_min":15,"energia":"baixa","impedimento":null,'
+    '"impedimento_externo":false,"proximo_passo":null,"confianca":0.9},'
+    '{"titulo":"Limpar o banheiro","lista_sugerida":"Casa","quadrante_sugerido":3,'
+    '"prazo_sugerido":null,"estimativa_min":30,"energia":"media","impedimento":null,'
+    '"impedimento_externo":false,"proximo_passo":null,"confianca":0.9},'
+    '{"titulo":"Tirar o lixo","lista_sugerida":"Casa","quadrante_sugerido":3,'
+    '"prazo_sugerido":null,"estimativa_min":5,"energia":"baixa","impedimento":null,'
+    '"impedimento_externo":false,"proximo_passo":null,"confianca":0.9},'
+    '{"titulo":"Adicionar filtro por energia no /agora","lista_sugerida":null,'
+    '"quadrante_sugerido":2,"prazo_sugerido":null,"estimativa_min":60,"energia":"alta",'
+    '"impedimento":null,"impedimento_externo":false,"proximo_passo":null,"confianca":0.7},'
+    '{"titulo":"Criar tela de estatísticas semanais","lista_sugerida":null,'
+    '"quadrante_sugerido":2,"prazo_sugerido":null,"estimativa_min":120,"energia":"alta",'
+    '"impedimento":"vaga_grande","impedimento_externo":false,'
+    '"proximo_passo":"Esboçar quais métricas mostrar em uma nota",'
+    '"confianca":0.7}'
+    ']}'
+)
+
+_FS_D_USER = (
+    'Texto para classificar:\n"""\n'
+    "Pagar C6 bank, Saraiva, nubank, personal, painel solar. Comprar presente tia Lúcia.\n\"\"\""
+)
+_FS_D_RESP = (
+    '{"tarefas":['
+    '{"titulo":"Pagar C6 Bank","lista_sugerida":"Financeiro","quadrante_sugerido":1,'
+    '"prazo_sugerido":null,"estimativa_min":5,"energia":"baixa","impedimento":null,'
+    '"impedimento_externo":false,"proximo_passo":null,"confianca":0.9},'
+    '{"titulo":"Pagar Saraiva","lista_sugerida":"Financeiro","quadrante_sugerido":1,'
+    '"prazo_sugerido":null,"estimativa_min":5,"energia":"baixa","impedimento":null,'
+    '"impedimento_externo":false,"proximo_passo":null,"confianca":0.9},'
+    '{"titulo":"Pagar Nubank","lista_sugerida":"Financeiro","quadrante_sugerido":1,'
+    '"prazo_sugerido":null,"estimativa_min":5,"energia":"baixa","impedimento":null,'
+    '"impedimento_externo":false,"proximo_passo":null,"confianca":0.9},'
+    '{"titulo":"Pagar Personal Trainer","lista_sugerida":"Financeiro","quadrante_sugerido":1,'
+    '"prazo_sugerido":null,"estimativa_min":5,"energia":"baixa","impedimento":null,'
+    '"impedimento_externo":false,"proximo_passo":null,"confianca":0.9},'
+    '{"titulo":"Pagar Painel Solar","lista_sugerida":"Financeiro","quadrante_sugerido":1,'
+    '"prazo_sugerido":null,"estimativa_min":5,"energia":"baixa","impedimento":null,'
+    '"impedimento_externo":false,"proximo_passo":null,"confianca":0.9},'
+    '{"titulo":"Comprar presente da Tia Lúcia","lista_sugerida":null,"quadrante_sugerido":2,'
+    '"prazo_sugerido":null,"estimativa_min":30,"energia":"media","impedimento":null,'
+    '"impedimento_externo":false,"proximo_passo":null,"confianca":0.7}'
+    ']}'
+)
+
 # ---------------------------------------------------------------------------
 # System prompt builder
 # ---------------------------------------------------------------------------
@@ -74,10 +128,17 @@ def _build_system_prompt(listas: list[str], agora: str, timezone: str) -> str:
         f"- Fuso horário: {timezone}\n"
         f"- Listas disponíveis do usuário: {lista_str}\n\n"
         "O QUE FAZER\n"
-        "1. Separe o texto em tarefas atômicas. Uma frase pode conter várias tarefas "
-        '(separadas por vírgula, "e", quebras de linha, ponto). Cada ação independente é uma tarefa.\n'
-        "2. Não invente tarefas que não estão no texto. Não juncte tarefas distintas em uma só.\n"
-        '3. Reescreva o título de forma curta, clara e no infinitivo ou imperativo '
+        "1. Separe o texto em tarefas atômicas. Cada ação independente vira uma tarefa separada. "
+        "Itens separados por vírgula, ponto ou 'e' (quando ligam ações distintas) são tarefas diferentes. "
+        "Ex.: 'lavar roupa, limpar o banheiro e tirar o lixo' → 3 tarefas.\n"
+        "2. Verbo implícito: quando um verbo no início se aplica a uma lista de itens, "
+        "repita-o no título de cada item. "
+        "Ex.: 'Pagar C6, Nubank, energia' → 'Pagar C6', 'Pagar Nubank', 'Pagar Energia' (3 tarefas). "
+        "Ex.: 'Ligar para dentista, médico e farmácia' → 3 tarefas com 'Ligar para' em cada.\n"
+        "3. Não agrupe tarefas distintas em uma só, mesmo que pertençam ao mesmo tema. "
+        "Se foram listadas separadamente, crie uma entrada para cada.\n"
+        "4. Não invente tarefas que não estão no texto.\n"
+        '4. Reescreva o título de forma curta, clara e no infinitivo ou imperativo '
         '(ex.: "Ligar para o dentista"), preservando nomes próprios e detalhes essenciais.\n\n'
         "PARA CADA TAREFA, PREENCHA\n"
         "- titulo (string): título curto e acionável.\n"
@@ -342,6 +403,10 @@ def classificar_brain_dump(
             types.Content(role="model", parts=[types.Part(text=_FS_A_RESP)]),
             types.Content(role="user", parts=[types.Part(text=_FS_B_USER)]),
             types.Content(role="model", parts=[types.Part(text=_FS_B_RESP)]),
+            types.Content(role="user", parts=[types.Part(text=_FS_C_USER)]),
+            types.Content(role="model", parts=[types.Part(text=_FS_C_RESP)]),
+            types.Content(role="user", parts=[types.Part(text=_FS_D_USER)]),
+            types.Content(role="model", parts=[types.Part(text=_FS_D_RESP)]),
             types.Content(role="user", parts=[types.Part(text=user_message)]),
         ]
         response = client.models.generate_content(
@@ -350,7 +415,7 @@ def classificar_brain_dump(
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 temperature=0.1,
-                max_output_tokens=2048,
+                max_output_tokens=4096,
             ),
         )
         return parse_resposta(response.text or "", texto, listas_ativas)
