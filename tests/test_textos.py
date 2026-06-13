@@ -433,6 +433,30 @@ def test_msg_casal_mostra_estimativa():
     assert "20min" in resultado
 
 
+def test_msg_casal_mostra_criador_e_data():
+    import uuid
+    criador = uuid.uuid4()
+    task = _mock_task(
+        title="Comprar tinta",
+        created_by=criador,
+        created_at=datetime(2026, 6, 12, 17, 30, tzinfo=timezone.utc),  # 14:30 BRT
+    )
+    resultado = textos.msg_casal([task], names={criador: "Jamile Martins"})
+    assert "Comprar tinta" in resultado
+    assert "Jamile" in resultado          # primeiro nome do criador
+    assert "12/06 às 14:30" in resultado  # data/hora em BRT
+
+
+def test_msg_casal_sem_criador_mostra_so_data():
+    task = _mock_task(
+        title="Tarefa antiga",
+        created_by=None,
+        created_at=datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc),  # 09:00 BRT
+    )
+    resultado = textos.msg_casal([task])
+    assert "01/06 às 09:00" in resultado
+
+
 def test_msg_busca_contem_titulo_e_termo():
     t = _mock_task(title="Reunião mensal")
     resultado = textos.msg_busca([t], "reunião")

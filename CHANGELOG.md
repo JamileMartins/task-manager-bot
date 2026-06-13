@@ -7,6 +7,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não lançado]
 
+## [1.21.0] — 2026-06-13 — Autoria nas tarefas do casal
+
+### Adicionado
+
+- A lista de tarefas compartilhadas do casal (`/casal` e botão "ver casal") agora exibe, abaixo de cada tarefa, quem a cadastrou (primeiro nome) e a data/hora de criação no fuso de Fortaleza-CE — ex.: `✍️ Jamile · 12/06 às 14:30`. Tarefas antigas sem criador registrado mostram só a data.
+
 ## [1.20.1] — 2026-06-02 — Ajustes do /progresso de casal
 
 ### Corrigido
