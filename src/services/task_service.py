@@ -5,11 +5,11 @@ import re
 import unicodedata
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from src.db.models import Config, CoupleMember, Reminder, Task, TaskList, User
@@ -178,6 +178,7 @@ def delete_task(task_id: str | uuid.UUID) -> bool:
 _RECURRENCE_DELTA: dict[str, timedelta] = {
     "daily": timedelta(days=1),
     "weekly": timedelta(weeks=1),
+    "quinzenal": timedelta(weeks=2),
     "monthly": timedelta(days=30),
 }
 
@@ -301,6 +302,7 @@ class ListInfo:
     slug: str
     is_couple: bool
     open_task_count: int
+    view_window: Optional[str] = None
 
 
 @dataclass
@@ -340,6 +342,7 @@ def get_user_lists(chat_id: int) -> list[ListInfo]:
                 TaskList.name,
                 TaskList.slug,
                 TaskList.is_couple,
+                TaskList.view_window,
                 func.count(Task.id).label("open_count"),
             )
             .outerjoin(
@@ -347,12 +350,18 @@ def get_user_lists(chat_id: int) -> list[ListInfo]:
                 (Task.list_id == TaskList.id) & (Task.status == "aberta"),
             )
             .where(TaskList.user_id == user.id, TaskList.archived.is_(False))
-            .group_by(TaskList.id, TaskList.name, TaskList.slug, TaskList.is_couple, TaskList.sort_order)
+            .group_by(
+                TaskList.id, TaskList.name, TaskList.slug, TaskList.is_couple,
+                TaskList.view_window, TaskList.sort_order,
+            )
             .order_by(TaskList.sort_order)
         ).all()
 
         return [
-            ListInfo(id=r.id, name=r.name, slug=r.slug, is_couple=r.is_couple, open_task_count=r.open_count)
+            ListInfo(
+                id=r.id, name=r.name, slug=r.slug, is_couple=r.is_couple,
+                open_task_count=r.open_count, view_window=r.view_window,
+            )
             for r in rows
         ]
 
@@ -418,6 +427,72 @@ def get_tasks_for_list(list_id: uuid.UUID) -> list[Task]:
             .where(Task.list_id == list_id, Task.status == "aberta")
             .order_by(Task.quadrant.nullslast(), Task.sort_order)
         ).all()
+
+
+# ---------------------------------------------------------------------------
+# Listas com janela de tempo (view_window: dia / semana / mes)
+# ---------------------------------------------------------------------------
+
+_VALID_WINDOWS = {"dia", "semana", "mes"}
+
+
+def _add_months(d: date, months: int) -> date:
+    """Soma `months` (pode ser negativo) a uma date, no dia 1 do mês."""
+    total = (d.year * 12 + (d.month - 1)) + months
+    year, month = divmod(total, 12)
+    return date(year, month + 1, 1)
+
+
+def _period_bounds(window: str, offset: int, now_local: datetime) -> tuple[datetime, datetime]:
+    """Início (inclusive) e fim (inclusive) do período, timezone-aware, no fuso de now_local.
+
+    offset=0 é o período atual; ±1 navega para o anterior/seguinte.
+    """
+    tz = now_local.tzinfo
+    day = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    if window == "dia":
+        start_d = (day + timedelta(days=offset))
+        end_d = start_d
+        start = start_d
+        end = end_d.replace(hour=23, minute=59, second=59, microsecond=999999)
+    elif window == "semana":
+        monday = day - timedelta(days=day.weekday())
+        start = monday + timedelta(weeks=offset)
+        end = (start + timedelta(days=6)).replace(hour=23, minute=59, second=59, microsecond=999999)
+    else:  # mes
+        first = _add_months(day.date(), offset)
+        nxt = _add_months(first, 1)
+        start = datetime(first.year, first.month, first.day, tzinfo=tz)
+        end = datetime(nxt.year, nxt.month, nxt.day, tzinfo=tz) - timedelta(microseconds=1)
+    return start, end
+
+
+def get_list_window_tasks(list_id: uuid.UUID, window: str, offset: int = 0) -> list[Task]:
+    """Tarefas abertas de uma lista com janela de tempo.
+
+    Inclui tarefas sem `due_at` (sempre, fixadas no topo) + tarefas cujo `due_at`
+    cai dentro do período `offset`. Ordenação: sem-data primeiro, depois due_at asc.
+    Para janela inválida, cai no comportamento de lista normal (todas as abertas).
+    """
+    if window not in _VALID_WINDOWS:
+        return get_tasks_for_list(list_id)
+    tz = ZoneInfo("America/Fortaleza")
+    now_local = datetime.now(tz)
+    start, end = _period_bounds(window, offset, now_local)
+    with get_session() as session:
+        return list(session.scalars(
+            select(Task)
+            .where(
+                Task.list_id == list_id,
+                Task.status == "aberta",
+                or_(
+                    Task.due_at.is_(None),
+                    and_(Task.due_at >= start, Task.due_at <= end),
+                ),
+            )
+            # Sem data primeiro (NULL no topo), depois por prazo, depois ordem manual.
+            .order_by(Task.due_at.nullsfirst(), Task.sort_order)
+        ).all())
 
 
 def get_inbox_tasks(chat_id: int) -> list[Task]:
@@ -812,7 +887,13 @@ def get_all_open_tasks(chat_id: int) -> list[TaskGroup]:
         return groups
 
 
-def create_list(chat_id: int, name: str) -> Optional[TaskList]:
+def create_list(chat_id: int, name: str, view_window: Optional[str] = None) -> Optional[TaskList]:
+    """Cria uma lista. `view_window` em {dia, semana, mes} define a janela de tempo
+    (quais tarefas aparecem por período); None/"nenhuma" = lista normal."""
+    if view_window in (None, "nenhuma", ""):
+        view_window = None
+    elif view_window not in _VALID_WINDOWS:
+        view_window = None
     with get_session() as session:
         user = session.scalar(select(User).where(User.telegram_chat_id == chat_id))
         if user is None:
@@ -825,6 +906,7 @@ def create_list(chat_id: int, name: str) -> Optional[TaskList]:
             name=name.strip(),
             slug=_slugify(name),
             sort_order=max_order + 1,
+            view_window=view_window,
         )
         session.add(lst)
         session.flush()

@@ -56,6 +56,10 @@ class TaskList(Base):
     )
     archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Janela de tempo da lista: None = lista normal (mostra tudo);
+    # "dia" / "semana" / "mes" = mostra só as tarefas do período (por due_at),
+    # com tarefas sem data sempre fixadas no topo. Medicações NÃO usa este campo.
+    view_window: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="lists")
     tasks: Mapped[List[Task]] = relationship(back_populates="task_list")

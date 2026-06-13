@@ -2740,3 +2740,123 @@ def test_chains_ignora_tarefas_concluidas(svc):
     # bloqueadora não aparece na chain
     all_ids = {t.id for chain in chains for t in chain}
     assert bloqueadora.id not in all_ids
+
+
+# ---------------------------------------------------------------------------
+# Recorrência quinzenal
+# ---------------------------------------------------------------------------
+
+def test_recurrence_next_due_quinzenal_avanca_14_dias():
+    base = datetime(2026, 6, 1, 9, 0, tzinfo=timezone.utc)
+    assert task_service._recurrence_next_due("quinzenal", base) == base + timedelta(days=14)
+
+
+def test_complete_task_quinzenal_cria_proxima_em_14_dias(svc):
+    user = _user(svc)
+    prazo = datetime(2026, 6, 1, 9, 0, tzinfo=timezone.utc)
+    t = _task_f3(svc, user, title="Quinzenal", due_at=prazo)
+    t.recurrence = "quinzenal"
+    svc.flush()
+
+    task_service.complete_task(t.id)
+
+    proxima = svc.scalar(
+        select(Task).where(Task.user_id == user.id, Task.status == "aberta")
+    )
+    assert proxima is not None
+    assert proxima.recurrence == "quinzenal"
+    due = proxima.due_at.replace(tzinfo=timezone.utc) if proxima.due_at.tzinfo is None else proxima.due_at
+    assert due == prazo + timedelta(days=14)
+
+
+# ---------------------------------------------------------------------------
+# Listas com janela de tempo (view_window)
+# ---------------------------------------------------------------------------
+
+def test_create_list_com_view_window_mensal(svc):
+    user = _user(svc)
+    lst = task_service.create_list(user.telegram_chat_id, "Financeiro", "mes")
+    assert lst is not None
+    assert lst.view_window == "mes"
+
+    infos = task_service.get_user_lists(user.telegram_chat_id)
+    info = next(i for i in infos if i.id == lst.id)
+    assert info.view_window == "mes"
+
+
+def test_create_list_view_window_invalida_vira_none(svc):
+    user = _user(svc)
+    lst = task_service.create_list(user.telegram_chat_id, "Qualquer", "xpto")
+    assert lst is not None
+    assert lst.view_window is None
+
+
+def test_create_list_view_window_nenhuma_vira_none(svc):
+    user = _user(svc)
+    lst = task_service.create_list(user.telegram_chat_id, "Normal", "nenhuma")
+    assert lst.view_window is None
+
+
+def test_get_list_window_tasks_mensal_filtra_por_mes_e_fixa_sem_data(svc):
+    from zoneinfo import ZoneInfo
+    user = _user(svc)
+    lst = _list(svc, user, name="Financeiro")
+    lst.view_window = "mes"
+    svc.flush()
+
+    agora = datetime.now(ZoneInfo("America/Fortaleza"))
+    com_data = _task_f3(svc, user, title="Conta deste mês", due_at=agora, list_id=lst.id)
+    sem_data = _task_f3(svc, user, title="Sem prazo", due_at=None, list_id=lst.id)
+
+    # Mês atual: aparecem os dois, com a tarefa sem data no topo.
+    atual = task_service.get_list_window_tasks(lst.id, "mes", 0)
+    ids_atual = [t.id for t in atual]
+    assert com_data.id in ids_atual
+    assert sem_data.id in ids_atual
+    assert atual[0].id == sem_data.id  # sem data fixada no topo
+
+    # Mês anterior: a tarefa com data some; a sem data continua visível.
+    anterior = task_service.get_list_window_tasks(lst.id, "mes", -1)
+    ids_anterior = [t.id for t in anterior]
+    assert com_data.id not in ids_anterior
+    assert sem_data.id in ids_anterior
+
+
+def test_get_list_window_tasks_diaria_inclui_hoje_exclui_amanha(svc):
+    from zoneinfo import ZoneInfo
+    user = _user(svc)
+    lst = _list(svc, user, name="Hoje")
+    lst.view_window = "dia"
+    svc.flush()
+
+    agora = datetime.now(ZoneInfo("America/Fortaleza")).replace(hour=12, minute=0, second=0, microsecond=0)
+    hoje = _task_f3(svc, user, title="Tarefa de hoje", due_at=agora, list_id=lst.id)
+
+    assert hoje.id in [t.id for t in task_service.get_list_window_tasks(lst.id, "dia", 0)]
+    assert hoje.id not in [t.id for t in task_service.get_list_window_tasks(lst.id, "dia", 1)]
+    assert hoje.id not in [t.id for t in task_service.get_list_window_tasks(lst.id, "dia", -1)]
+
+
+def test_get_list_window_tasks_semanal_inclui_semana_atual(svc):
+    from zoneinfo import ZoneInfo
+    user = _user(svc)
+    lst = _list(svc, user, name="Semana")
+    lst.view_window = "semana"
+    svc.flush()
+
+    agora = datetime.now(ZoneInfo("America/Fortaleza")).replace(hour=12, minute=0, second=0, microsecond=0)
+    t = _task_f3(svc, user, title="Tarefa da semana", due_at=agora, list_id=lst.id)
+
+    assert t.id in [x.id for x in task_service.get_list_window_tasks(lst.id, "semana", 0)]
+    assert t.id not in [x.id for x in task_service.get_list_window_tasks(lst.id, "semana", 1)]
+
+
+def test_get_list_window_tasks_janela_invalida_retorna_todas_abertas(svc):
+    user = _user(svc)
+    lst = _list(svc, user, name="Qualquer")
+    a = _task_f3(svc, user, title="A", list_id=lst.id)
+    b = _task_f3(svc, user, title="B", list_id=lst.id)
+
+    res = task_service.get_list_window_tasks(lst.id, "anual", 0)
+    ids = {t.id for t in res}
+    assert {a.id, b.id} <= ids

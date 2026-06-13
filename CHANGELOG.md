@@ -7,6 +7,17 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não lançado]
 
+## [1.22.0] — 2026-06-13 — Janela de tempo por lista + recorrência quinzenal
+
+### Adicionado
+
+- **Janela de tempo por lista**: ao criar uma lista, dá pra escolher se ela mostra tudo (padrão) ou só as tarefas de um período — **diária**, **semanal** ou **mensal**. Listas com janela filtram pelas tarefas do período (pela data), com as tarefas **sem data fixadas no topo**, e trazem navegação **◀ ▶** entre períodos (ex.: navegar entre os meses numa lista "Financeiro"). Nova coluna `lists.view_window` (migração 0010).
+- **Recorrência quinzenal** por botão no detalhe da tarefa, junto de Diária/Semanal/Mensal — repete a cada 14 dias.
+
+### Mantido
+
+- A lista de medicações continua com comando e comportamento próprios, sem alteração.
+
 ## [1.21.0] — 2026-06-13 — Autoria nas tarefas do casal
 
 ### Adicionado

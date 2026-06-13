@@ -457,6 +457,31 @@ def test_msg_casal_sem_criador_mostra_so_data():
     assert "01/06 às 09:00" in resultado
 
 
+def test_msg_task_detail_exibe_recorrencia_quinzenal():
+    t = _mock_task(title="Pagar fatura", recurrence="quinzenal", blocker_note=None, category=None)
+    resultado = textos.msg_task_detail(t)
+    assert "Quinzenal" in resultado
+
+
+def test_periodo_label_mensal():
+    label = textos.periodo_label("mes", 0)
+    # Ex.: "junho/2026" — contém uma barra e um nome de mês em PT-BR.
+    assert "/" in label
+    assert any(m in label for m in textos._MESES_PT)
+
+
+def test_periodo_label_diaria_contem_dia_da_semana():
+    label = textos.periodo_label("dia", 0)
+    assert "/" in label
+    assert "(" in label and ")" in label
+
+
+def test_periodo_label_semanal_tem_intervalo():
+    label = textos.periodo_label("semana", 0)
+    assert "semana de" in label
+    assert "–" in label
+
+
 def test_msg_busca_contem_titulo_e_termo():
     t = _mock_task(title="Reunião mensal")
     resultado = textos.msg_busca([t], "reunião")
