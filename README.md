@@ -1,6 +1,6 @@
 # Task Manager — Bot de Tarefas para Telegram
 
-Um "segundo cérebro" de tarefas no Telegram, em **instância privada com allowlist de chats**, projetado para baixo atrito e apoio a funções executivas (TDAH). Captura por texto e voz, classificação assistida por IA, Matriz de Eisenhower, sugestão de "o que fazer agora", sistema de impedimentos, rituais de revisão, medicações, foco, tarefas compartilhadas de casal e visão de progresso.
+Um "segundo cérebro" de tarefas no Telegram, em **instância privada com allowlist de chats**, projetado para baixo atrito e apoio a funções executivas (TDAH). Captura por texto e voz, classificação assistida por IA, Matriz de Eisenhower, sugestão de "o que fazer agora", sistema de impedimentos, rituais de revisão, medicações, foco, tarefas compartilhadas de casal, listas com janela de tempo (diária/semanal/mensal) e visão de progresso.
 
 > **Instância privada por design:** cada instalação roda com seus próprios bots, banco e chaves. O bot responde apenas aos chats em `AUTHORIZED_CHAT_ID`/`ALLOWED_CHAT_IDS`. O modo casal permite dois usuários autorizados, mantendo tarefas pessoais isoladas e compartilhando apenas tarefas com `couple_id`.
 

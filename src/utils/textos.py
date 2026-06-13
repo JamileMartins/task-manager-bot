@@ -60,6 +60,12 @@ MSG_AJUDA = (
     "🏓 /ping — verificar se estou funcionando\n"
     "🔄 /reiniciar — reiniciar o bot\n\n"
     "📖 /quadrantes — o que significam Q1, Q2, Q3, Q4 e como uso a energia\n\n"
+    "🗓️ Janela de tempo — ao criar uma lista (ou no ⚙️ dentro de /listas) você "
+    "escolhe se ela mostra tudo ou só as tarefas do *dia*, da *semana* ou do *mês*. "
+    "Listas mensais (ex.: Financeiro) deixam navegar entre os meses com ◀ ▶, e tarefas "
+    "sem data ficam fixadas no topo.\n\n"
+    "🔁 Recorrência — no detalhe de qualquer tarefa dá pra repetir *Diária*, *Semanal*, "
+    "*Quinzenal* ou *Mensal*.\n\n"
     "😩 Impedimento — abra o detalhe de qualquer tarefa e toque em *Travada*. "
     "Também aparece ao pular uma tarefa no /agora.\n\n"
     "Dica: você quase nunca precisa de comando. "
@@ -193,6 +199,22 @@ def msg_lista_criada(nome: str, view_window: str | None = None) -> str:
     if view_window in _WINDOW_NOME:
         return f'Criada ✅ "{nome}" (janela {_WINDOW_NOME[view_window]}) já tá disponível.'
     return MSG_LISTA_CRIADA.format(nome=nome)
+
+
+def msg_lista_janela_menu(nome: str) -> str:
+    return (
+        f'Como a lista "{nome}" deve mostrar as tarefas? 🗓️\n\n'
+        "• *Sem janela* — mostra todas as tarefas\n"
+        "• *Diária* — só as do dia\n"
+        "• *Semanal* — só as da semana\n"
+        "• *Mensal* — só as do mês (dá pra navegar entre os meses)"
+    )
+
+
+def msg_lista_janela_alterada(nome: str, view_window: str | None = None) -> str:
+    if view_window in _WINDOW_NOME:
+        return f'Pronto ✅ "{nome}" agora mostra só as tarefas do período ({_WINDOW_NOME[view_window]}).'
+    return f'Pronto ✅ "{nome}" voltou a mostrar todas as tarefas (sem janela).'
 
 
 _MESES_PT = [

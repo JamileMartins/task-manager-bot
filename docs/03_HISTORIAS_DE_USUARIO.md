@@ -380,6 +380,31 @@
 
 ---
 
+## Épico 9 — Listas por período e recorrência avançada
+
+### US-33 — Janela de tempo por lista
+
+**Como** a usuária, **quero** que uma lista mostre só as tarefas de um período (dia, semana ou mês), **para** ter listas focadas como uma "Financeiro" que exibe o mês corrente sem poluir com tudo.
+
+- **CA:**
+  - Ao criar uma lista, escolho a janela: Sem janela (padrão) / Diária / Semanal / Mensal (coluna `lists.view_window`).
+  - Posso editar a janela de uma lista existente pelo menu ⚙️ em `/listas` → "🗓️ Janela de tempo" (✓ na atual).
+  - Listas com janela mostram só as tarefas cujo `due_at` cai no período; tarefas sem data ficam fixadas no topo, em qualquer período.
+  - Listas com janela têm navegação ◀ ▶ entre períodos, com cabeçalho do período (ex.: "junho/2026").
+  - A lista de medicações (`/medicacoes`) mantém comportamento próprio, sem usar `view_window`.
+- Prioridade: Should · Fase: F7 · **Status: ✅ Feito**
+
+### US-34 — Recorrência quinzenal
+
+**Como** a usuária, **quero** marcar uma tarefa como quinzenal por botão, **para** repetir a cada 14 dias junto das opções diária/semanal/mensal.
+
+- **CA:**
+  - O detalhe da tarefa oferece o botão "🔁 Quinzenal" junto de Diária/Semanal/Mensal, com ✓ na opção ativa.
+  - Ao concluir uma tarefa quinzenal, a próxima ocorrência é criada com `due_at` +14 dias.
+- Prioridade: Could · Fase: F7 · **Status: ✅ Feito**
+
+---
+
 ## Resumo de priorização e status
 
 | Fase | Histórias | Status |
@@ -390,3 +415,4 @@
 | F4 | US-14, US-15, US-16, US-17, US-18, US-20, US-23, US-24, US-25, US-26, US-27, US-28, US-29 | ✅ Completa |
 | F5 | US-19, US-22 | ✅ Completa |
 | F6 | US-30, US-31, US-32 | ✅ Completa |
+| F7 | US-33, US-34 | ✅ Completa |

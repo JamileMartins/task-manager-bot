@@ -104,6 +104,7 @@ Couple (1) ───< (N) Invite
 | couple_id | UUID FK nullable | legado/escopo de lista compartilhada |
 | archived | BOOLEAN | default false |
 | sort_order | INT | |
+| view_window | TEXT nullable | janela de tempo: 'dia' \| 'semana' \| 'mes' \| null (sem janela). Lista filtra tarefas pelo período do `due_at`; sem data fica no topo. Medicações não usa este campo. |
 
 #### tasks
 
@@ -120,7 +121,7 @@ Couple (1) ───< (N) Invite
 | notes | TEXT nullable | |
 | quadrant | SMALLINT nullable | 1–4 (Eisenhower); null = não classificado |
 | due_at | TIMESTAMPTZ nullable | prazo |
-| recurrence | TEXT nullable | 'daily' \| 'weekly' \| 'monthly' \| null |
+| recurrence | TEXT nullable | 'daily' \| 'weekly' \| 'weekly:N' \| 'quinzenal' (14 dias) \| 'monthly' \| null |
 | estimate_min | INT nullable | minutos estimados |
 | energy | TEXT nullable | 'alta' \| 'media' \| 'baixa' |
 | status | TEXT | 'aberta' \| 'aguardando' \| 'concluida' \| 'arquivada' |

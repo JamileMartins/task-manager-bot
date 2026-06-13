@@ -2860,3 +2860,31 @@ def test_get_list_window_tasks_janela_invalida_retorna_todas_abertas(svc):
     res = task_service.get_list_window_tasks(lst.id, "anual", 0)
     ids = {t.id for t in res}
     assert {a.id, b.id} <= ids
+
+
+def test_set_list_window_define_e_remove_janela(svc):
+    user = _user(svc)
+    lst = _list(svc, user, name="Financeiro")
+    assert lst.view_window is None
+
+    atualizada = task_service.set_list_window(lst.id, "mes")
+    assert atualizada is not None
+    assert atualizada.view_window == "mes"
+
+    # Voltar para sem janela.
+    voltou = task_service.set_list_window(lst.id, "nenhuma")
+    assert voltou.view_window is None
+
+
+def test_set_list_window_valor_invalido_vira_none(svc):
+    user = _user(svc)
+    lst = _list(svc, user, name="Qualquer")
+    lst.view_window = "mes"
+    svc.flush()
+
+    atualizada = task_service.set_list_window(lst.id, "anual")
+    assert atualizada.view_window is None
+
+
+def test_set_list_window_lista_inexistente_retorna_none(svc):
+    assert task_service.set_list_window(uuid.uuid4(), "mes") is None

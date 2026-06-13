@@ -923,6 +923,22 @@ def rename_list(list_id: uuid.UUID, new_name: str) -> Optional[TaskList]:
         return lst
 
 
+def set_list_window(list_id: uuid.UUID, view_window: Optional[str]) -> Optional[TaskList]:
+    """Altera a janela de tempo de uma lista existente.
+
+    `view_window` em {dia, semana, mes}; None/"nenhuma"/inválido → sem janela.
+    Retorna a lista atualizada, ou None se não encontrada.
+    """
+    if view_window in (None, "nenhuma", "") or view_window not in _VALID_WINDOWS:
+        view_window = None
+    with get_session() as session:
+        lst = session.get(TaskList, list_id)
+        if lst is None:
+            return None
+        lst.view_window = view_window
+        return lst
+
+
 def archive_list(list_id: uuid.UUID) -> Optional[str]:
     """Arquiva a lista. Retorna o nome se bem-sucedido, None se não encontrada."""
     with get_session() as session:

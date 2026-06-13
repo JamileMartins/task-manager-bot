@@ -7,6 +7,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não lançado]
 
+## [1.22.1] — 2026-06-13 — Editar janela de tempo + ajuda
+
+### Adicionado
+
+- **Editar a janela de tempo de listas existentes**: no menu ⚙️ de uma lista (em `/listas`) há o botão **🗓️ Janela de tempo**, que abre um submenu para alternar entre Sem janela / Diária / Semanal / Mensal (com ✓ na atual).
+- Comando `/ajuda` agora explica a janela de tempo das listas e as opções de recorrência (incluindo a quinzenal).
+
 ## [1.22.0] — 2026-06-13 — Janela de tempo por lista + recorrência quinzenal
 
 ### Adicionado
