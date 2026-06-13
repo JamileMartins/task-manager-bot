@@ -915,6 +915,32 @@ def couple_mode_label(task, names: dict | None = None) -> str:
     return "🤝 sem dono"
 
 
+def _autoria_casal(task, names: dict | None = None) -> str:
+    """Linha de autoria de uma tarefa do casal: quem cadastrou e quando.
+
+    Ex.: "✍️ Jamile · 12/06 às 14:30". Tolerante a tarefa sem criador
+    (tarefas antigas, antes do registro de autoria) ou sem data.
+    """
+    names = names or {}
+    criador = getattr(task, "created_by", None)
+    nome = (names.get(criador) or "").split()[0] if criador else ""
+
+    criado = getattr(task, "created_at", None)
+    quando = ""
+    if criado is not None:
+        if criado.tzinfo is None:
+            criado = criado.replace(tzinfo=_pytz.utc)
+        quando = criado.astimezone(_BRT).strftime("%d/%m às %H:%M")
+
+    if nome and quando:
+        return f"✍️ {nome} · {quando}"
+    if nome:
+        return f"✍️ {nome}"
+    if quando:
+        return f"🕓 {quando}"
+    return ""
+
+
 def msg_casal(tasks: list, names: dict | None = None) -> str:
     n = len(tasks)
     header = f"💞 Casal — {n} {'tarefa' if n == 1 else 'tarefas'}:\n"
@@ -923,6 +949,9 @@ def msg_casal(tasks: list, names: dict | None = None) -> str:
         q = QUADRANT_EMOJI.get(t.quadrant, "◾") if t.quadrant else "◾"
         est = f" · {t.estimate_min}min" if t.estimate_min else ""
         lines.append(f"{q} {t.title}{est}  ({couple_mode_label(t, names)})")
+        autoria = _autoria_casal(t, names)
+        if autoria:
+            lines.append(f"      {autoria}")
     return "\n".join(lines)
 
 
