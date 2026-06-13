@@ -176,7 +176,61 @@ MSG_LISTA_VAZIA = "{nome} tá vazia por enquanto.\nQuando surgir algo dessa áre
 
 MSG_PERGUNTAR_NOME_LISTA = "Como vai se chamar a nova lista?"
 
+MSG_PERGUNTAR_JANELA_LISTA = (
+    'E "{nome}" deve mostrar tudo ou só as tarefas de um período? 🗓️\n\n'
+    "• *Sem janela* — mostra todas as tarefas (padrão)\n"
+    "• *Diária* — só as do dia\n"
+    "• *Semanal* — só as da semana\n"
+    "• *Mensal* — só as do mês (dá pra navegar entre os meses)"
+)
+
+_WINDOW_NOME = {"dia": "diária", "semana": "semanal", "mes": "mensal"}
+
 MSG_LISTA_CRIADA = 'Criada ✅ "{nome}" já tá disponível.'
+
+
+def msg_lista_criada(nome: str, view_window: str | None = None) -> str:
+    if view_window in _WINDOW_NOME:
+        return f'Criada ✅ "{nome}" (janela {_WINDOW_NOME[view_window]}) já tá disponível.'
+    return MSG_LISTA_CRIADA.format(nome=nome)
+
+
+_MESES_PT = [
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+]
+_MESES_ABREV = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
+
+
+def _add_months_date(d, months: int):
+    from datetime import date as _date
+    total = (d.year * 12 + (d.month - 1)) + months
+    year, month = divmod(total, 12)
+    return _date(year, month + 1, 1)
+
+
+def periodo_label(window: str, offset: int) -> str:
+    """Rótulo curto do período navegado, em PT-BR e no fuso de Fortaleza.
+
+    Ex.: dia → "13/06 (sexta)"; semana → "semana de 09–15/jun"; mes → "junho/2026".
+    """
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo("America/Fortaleza")
+    hoje = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    if window == "dia":
+        d = hoje + timedelta(days=offset)
+        return f"{d.strftime('%d/%m')} ({_DOW_NOME[d.weekday()].lower()})"
+    if window == "semana":
+        ini = (hoje - timedelta(days=hoje.weekday())) + timedelta(weeks=offset)
+        fim = ini + timedelta(days=6)
+        if ini.month == fim.month:
+            return f"semana de {ini.day:02d}–{fim.day:02d}/{_MESES_ABREV[ini.month - 1]}"
+        return f"semana de {ini.day:02d}/{_MESES_ABREV[ini.month - 1]}–{fim.day:02d}/{_MESES_ABREV[fim.month - 1]}"
+    # mes
+    first = _add_months_date(hoje.date(), offset)
+    return f"{_MESES_PT[first.month - 1]}/{first.year}"
 
 MSG_PERGUNTAR_NOVO_NOME = 'Qual o novo nome para "{nome}"?'
 
@@ -390,7 +444,7 @@ def msg_task_detail(task, subtasks=None, blocking_task=None, blocked_dependents=
     if task.category and task.category in _CAT_LABEL:
         lines.append(_CAT_LABEL[task.category])
 
-    _REC_LABEL = {"daily": "🔁 Diária", "weekly": "🔁 Semanal", "monthly": "🔁 Mensal"}
+    _REC_LABEL = {"daily": "🔁 Diária", "weekly": "🔁 Semanal", "quinzenal": "🔁 Quinzenal", "monthly": "🔁 Mensal"}
     if task.recurrence and task.recurrence in _REC_LABEL:
         lines.append(_REC_LABEL[task.recurrence])
 

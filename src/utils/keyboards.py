@@ -71,9 +71,25 @@ def _task_label(task: Task, max_len: int = 32) -> str:
     return f"{prefix}{title}"
 
 
-def kb_tasks(tasks: Sequence[Task], list_id: uuid.UUID | None = None) -> InlineKeyboardMarkup:
-    """Título da tarefa (→ detalhe) + ✅ por linha."""
+def kb_tasks(
+    tasks: Sequence[Task],
+    list_id: uuid.UUID | None = None,
+    window: str | None = None,
+    offset: int = 0,
+) -> InlineKeyboardMarkup:
+    """Título da tarefa (→ detalhe) + ✅ por linha.
+
+    Para listas com janela de tempo (`window`), prepende uma linha de navegação
+    de período: ◀ anterior · [período atual] · próximo ▶.
+    """
     rows = []
+    if window and list_id is not None:
+        from src.utils.textos import periodo_label
+        rows.append([
+            InlineKeyboardButton("◀", callback_data=f"lwin:{list_id}:{offset - 1}"),
+            InlineKeyboardButton(periodo_label(window, offset), callback_data=f"lwin:{list_id}:0"),
+            InlineKeyboardButton("▶", callback_data=f"lwin:{list_id}:{offset + 1}"),
+        ])
     for task in tasks:
         rows.append([
             InlineKeyboardButton(_task_label(task), callback_data=f"task_dt:{task.id}"),
@@ -85,6 +101,18 @@ def kb_tasks(tasks: Sequence[Task], list_id: uuid.UUID | None = None) -> InlineK
         nav_row.append(InlineKeyboardButton("⚙️", callback_data=f"manage_list:{list_id}"))
     rows.append(nav_row)
     return InlineKeyboardMarkup(rows)
+
+
+def kb_list_window() -> InlineKeyboardMarkup:
+    """Escolha da janela de tempo ao criar uma lista."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📋 Sem janela", callback_data="lwin_new:nenhuma")],
+        [
+            InlineKeyboardButton("📅 Diária", callback_data="lwin_new:dia"),
+            InlineKeyboardButton("🗓️ Semanal", callback_data="lwin_new:semana"),
+            InlineKeyboardButton("📆 Mensal", callback_data="lwin_new:mes"),
+        ],
+    ])
 
 
 def kb_classificacao_resumo() -> InlineKeyboardMarkup:
@@ -234,10 +262,12 @@ def kb_task_detail(task: Task, listas: list[dict], subtasks=None, show_couple: b
         ])
 
         r_row = []
-        for val, label in [("daily", "🔁 Diária"), ("weekly", "🔁 Semanal"), ("monthly", "🔁 Mensal"), (None, "🚫 Sem rep.")]:
+        for val, label in [("daily", "🔁 Diária"), ("weekly", "🔁 Semanal"), ("quinzenal", "🔁 Quinzenal"), ("monthly", "🔁 Mensal")]:
             mark = " ✓" if task.recurrence == val else ""
-            r_row.append(InlineKeyboardButton(label + mark, callback_data=f"task_rec:{task.id}:{val or 'none'}"))
+            r_row.append(InlineKeyboardButton(label + mark, callback_data=f"task_rec:{task.id}:{val}"))
         rows.append(r_row)
+        sem_rep_mark = " ✓" if not task.recurrence else ""
+        rows.append([InlineKeyboardButton("🚫 Sem rep." + sem_rep_mark, callback_data=f"task_rec:{task.id}:none")])
         rows.append([
             InlineKeyboardButton("📂 Mover lista", callback_data=f"task_list:{task.id}"),
             InlineKeyboardButton("↑", callback_data=f"task_up:{task.id}"),

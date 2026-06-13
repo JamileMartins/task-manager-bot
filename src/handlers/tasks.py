@@ -16,6 +16,37 @@ from src.utils import keyboards, textos
 logger = logging.getLogger(__name__)
 
 
+async def _build_list_view(chat_id: int, list_id: uuid.UUID, offset: int = 0):
+    """Monta (texto, teclado) de uma lista, respeitando a janela de tempo (view_window).
+
+    Para listas com janela, filtra pelo período `offset` e adiciona navegação ◀▶;
+    para listas normais, mantém o comportamento padrão (todas as abertas).
+    """
+    lists = await asyncio.to_thread(task_service.get_user_lists, chat_id)
+    lista_info = next((l for l in lists if l.id == list_id), None)
+    nome = lista_info.name if lista_info else "Lista"
+    window = lista_info.view_window if lista_info else None
+
+    if window:
+        tasks = await asyncio.to_thread(task_service.get_list_window_tasks, list_id, window, offset)
+        periodo = textos.periodo_label(window, offset)
+        n = len(tasks)
+        if not tasks:
+            texto = f"📋 {nome} — {periodo}\nNada por aqui neste período."
+        else:
+            texto = f"📋 {nome} — {periodo} · {n} {'tarefa' if n == 1 else 'tarefas'}"
+        kb = keyboards.kb_tasks(tasks, list_id=list_id, window=window, offset=offset)
+        return texto, kb
+
+    tasks = await asyncio.to_thread(task_service.get_tasks_for_list, list_id)
+    if not tasks:
+        texto = textos.MSG_LISTA_VAZIA.format(nome=nome)
+    else:
+        n = len(tasks)
+        texto = f"📋 {nome} — {n} {'tarefa' if n == 1 else 'tarefas'}"
+    return texto, keyboards.kb_tasks(tasks, list_id=list_id)
+
+
 async def cmd_ver(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/ver <lista> — abre uma lista pelo nome ou parte do nome."""
     if not is_authorized(update):
@@ -37,14 +68,8 @@ async def cmd_ver(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             )
             return
 
-        tasks = await asyncio.to_thread(task_service.get_tasks_for_list, lst.id)
-        if not tasks:
-            texto = textos.MSG_LISTA_VAZIA.format(nome=lst.name)
-        else:
-            n = len(tasks)
-            texto = f"📋 {lst.name} — {n} {'tarefa' if n == 1 else 'tarefas'}"
-
-        await msg.reply_text(texto, reply_markup=keyboards.kb_tasks(tasks, list_id=lst.id))
+        texto, kb = await _build_list_view(chat_id, lst.id)
+        await msg.reply_text(texto, reply_markup=kb)
     except Exception:
         logger.exception("Erro ao ver lista por termo '%s'", term)
         await msg.reply_text(textos.MSG_ERRO_GENERICO)
@@ -58,24 +83,31 @@ async def cb_view_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     list_id = uuid.UUID(query.data.split(":")[1])
     try:
-        tasks = await asyncio.to_thread(task_service.get_tasks_for_list, list_id)
-
-        # Obtém nome da lista a partir da ListInfo para montar cabeçalho
-        lists = await asyncio.to_thread(task_service.get_user_lists, update.effective_chat.id)
-        lista_info = next((l for l in lists if l.id == list_id), None)
-        nome = lista_info.name if lista_info else "Lista"
-
-        if not tasks:
-            texto = textos.MSG_LISTA_VAZIA.format(nome=nome)
-            kb = keyboards.kb_tasks([], list_id=list_id)
-        else:
-            n = len(tasks)
-            texto = f"📋 {nome} — {n} {'tarefa' if n == 1 else 'tarefas'}"
-            kb = keyboards.kb_tasks(tasks, list_id=list_id)
-
+        texto, kb = await _build_list_view(update.effective_chat.id, list_id)
         await query.edit_message_text(texto, reply_markup=kb)
     except Exception:
         logger.exception("Erro ao ver lista %s", list_id)
+        await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+
+
+async def cb_list_window_nav(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Navega entre períodos de uma lista com janela de tempo (callback lwin:{id}:{offset})."""
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+
+    parts = query.data.split(":")
+    list_id = uuid.UUID(parts[1])
+    try:
+        offset = int(parts[2])
+    except (ValueError, IndexError):
+        offset = 0
+    try:
+        texto, kb = await _build_list_view(update.effective_chat.id, list_id, offset)
+        await query.edit_message_text(texto, reply_markup=kb)
+    except Exception:
+        logger.exception("Erro ao navegar período da lista %s", list_id)
         await query.edit_message_text(textos.MSG_ERRO_GENERICO)
 
 

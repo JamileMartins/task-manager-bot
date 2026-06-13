@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 _CREATE_NAME = 1
 _RENAME_NAME = 2
 _ADD_TASK_TITLE = 3
+_CREATE_WINDOW = 4
 
 
 # ---------------------------------------------------------------------------
@@ -108,13 +109,38 @@ async def save_new_list_name(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text(textos.MSG_PERGUNTAR_NOME_LISTA)
         return _CREATE_NAME
 
+    context.user_data["new_list_name"] = name
+    await update.message.reply_text(
+        textos.MSG_PERGUNTAR_JANELA_LISTA.format(nome=name),
+        parse_mode="Markdown",
+        reply_markup=keyboards.kb_list_window(),
+    )
+    return _CREATE_WINDOW
+
+
+async def cb_set_new_list_window(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return ConversationHandler.END
+
+    window = query.data.split(":")[1]  # nenhuma | dia | semana | mes
+    name = context.user_data.pop("new_list_name", "")
+    if not name:
+        await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+        return ConversationHandler.END
+
     try:
-        lst = await asyncio.to_thread(task_service.create_list, update.effective_chat.id, name)
-        await update.message.reply_text(textos.MSG_LISTA_CRIADA.format(nome=lst.name if lst else name))
-        await _show_lists(update.message, update.effective_chat.id, via_message=True)
+        lst = await asyncio.to_thread(
+            task_service.create_list, update.effective_chat.id, name, window
+        )
+        await query.edit_message_text(
+            textos.msg_lista_criada(lst.name if lst else name, lst.view_window if lst else None)
+        )
+        await _show_lists(query.message, update.effective_chat.id, via_message=True)
     except Exception:
         logger.exception("Erro ao criar lista")
-        await update.message.reply_text(textos.MSG_ERRO_GENERICO)
+        await query.edit_message_text(textos.MSG_ERRO_GENERICO)
     return ConversationHandler.END
 
 
@@ -281,6 +307,7 @@ list_conversation = ConversationHandler(
     ],
     states={
         _CREATE_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_new_list_name)],
+        _CREATE_WINDOW: [CallbackQueryHandler(cb_set_new_list_window, pattern=r"^lwin_new:")],
         _RENAME_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_rename_list)],
         _ADD_TASK_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_add_task)],
     },
