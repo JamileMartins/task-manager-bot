@@ -87,6 +87,51 @@ async def cb_cancel_mgmt(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 # ---------------------------------------------------------------------------
+# Editar janela de tempo de uma lista existente
+# ---------------------------------------------------------------------------
+
+async def cb_list_window_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Abre o submenu para alterar a janela de tempo da lista (✓ na atual)."""
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+    list_id = uuid.UUID(query.data.split(":")[1])
+    lists = await asyncio.to_thread(task_service.get_user_lists, update.effective_chat.id)
+    lista_info = next((l for l in lists if l.id == list_id), None)
+    nome = lista_info.name if lista_info else "lista"
+    current = lista_info.view_window if lista_info else None
+    await query.edit_message_text(
+        textos.msg_lista_janela_menu(nome),
+        parse_mode="Markdown",
+        reply_markup=keyboards.kb_list_window_edit(list_id, current),
+    )
+
+
+async def cb_set_list_window(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Aplica a nova janela de tempo (callback set_window:{list_id}:{valor})."""
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+    parts = query.data.split(":")
+    list_id = uuid.UUID(parts[1])
+    window = parts[2]  # nenhuma | dia | semana | mes
+    try:
+        lst = await asyncio.to_thread(task_service.set_list_window, list_id, window)
+        if lst is None:
+            await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+            return
+        await query.edit_message_text(
+            textos.msg_lista_janela_alterada(lst.name, lst.view_window)
+        )
+        await _show_lists(query.message, update.effective_chat.id, via_message=True)
+    except Exception:
+        logger.exception("Erro ao alterar janela da lista %s", list_id)
+        await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+
+
+# ---------------------------------------------------------------------------
 # Criar lista (ConversationHandler)
 # ---------------------------------------------------------------------------
 

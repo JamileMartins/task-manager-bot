@@ -48,6 +48,22 @@ def kb_gerenciar_lista(list_id: uuid.UUID) -> InlineKeyboardMarkup:
             InlineKeyboardButton("✏️ Renomear", callback_data=f"rename_list:{list_id}"),
             InlineKeyboardButton("📦 Arquivar", callback_data=f"archive_list:{list_id}"),
         ],
+        [InlineKeyboardButton("🗓️ Janela de tempo", callback_data=f"list_window_cfg:{list_id}")],
+        [InlineKeyboardButton("✖️ Cancelar", callback_data="cancel_mgmt")],
+    ])
+
+
+def kb_list_window_edit(list_id: uuid.UUID, current: str | None) -> InlineKeyboardMarkup:
+    """Submenu para alterar a janela de tempo de uma lista existente (✓ na atual)."""
+    def _mark(value: str | None) -> str:
+        return " ✓" if (current or None) == value else ""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📋 Sem janela" + _mark(None), callback_data=f"set_window:{list_id}:nenhuma")],
+        [
+            InlineKeyboardButton("📅 Diária" + _mark("dia"), callback_data=f"set_window:{list_id}:dia"),
+            InlineKeyboardButton("🗓️ Semanal" + _mark("semana"), callback_data=f"set_window:{list_id}:semana"),
+            InlineKeyboardButton("📆 Mensal" + _mark("mes"), callback_data=f"set_window:{list_id}:mes"),
+        ],
         [InlineKeyboardButton("✖️ Cancelar", callback_data="cancel_mgmt")],
     ])
 

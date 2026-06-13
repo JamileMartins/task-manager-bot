@@ -48,6 +48,8 @@ Implemente uma fase por vez. Ao final de cada fase, rode os testes e confirme os
 Tabelas: `users`, `lists`, `tasks`, `reminders`, `config`. Detalhes completos em `docs/02_ESPECIFICACAO_TECNICA.md` seção 3. Pontos-chave:
 
 - `tasks.list_id` nulo = Inbox.
+- `lists.view_window` em {dia, semana, mes} = janela de tempo da lista (mostra só tarefas do período pelo `due_at`; sem data fica no topo; navegação ◀▶). Nulo = lista normal. Medicações não usa este campo.
+- `tasks.recurrence` em {daily, weekly, weekly:N, quinzenal (14 dias), monthly}, nulo = não recorrente.
 - `tasks.quadrant` 1–4 (Eisenhower), nulo = não classificado.
 - `tasks.energy` em {alta, media, baixa}; `tasks.estimate_min` em minutos.
 - `tasks.last_touched_at` alimenta a revisão semanal (parada há N dias).
