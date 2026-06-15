@@ -1099,6 +1099,21 @@ def test_archive_task_inexistente_retorna_false(svc):
     assert task_service.archive_task(uuid.uuid4()) is False
 
 
+def test_archive_task_remove_da_listagem(svc):
+    """Remover (descartar) tira a tarefa das listagens sem marcá-la como concluída."""
+    user = _user(svc)
+    lst = _list(svc, user, name="Trabalho")
+    t = _task(svc, user, list_id=lst.id)
+    assert t.id in [x.id for x in task_service.get_tasks_for_list(lst.id)]
+
+    task_service.archive_task(t.id)
+
+    svc.refresh(t)
+    assert t.status == "arquivada"          # não é 'concluida'
+    assert t.completed_at is None           # não conta como concluída
+    assert t.id not in [x.id for x in task_service.get_tasks_for_list(lst.id)]
+
+
 # ---------------------------------------------------------------------------
 # F4 — reschedule_task
 # ---------------------------------------------------------------------------

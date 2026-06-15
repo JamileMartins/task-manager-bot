@@ -176,9 +176,62 @@ async def cb_task_set_couple(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if make_couple:
         actor = (update.effective_user.full_name if update.effective_user else None) or "Seu par"
         await notify.notify_partner(
-            update.effective_chat.id, context.bot, textos.msg_casal_compartilhou(actor, 1)
+            update.effective_chat.id,
+            context.bot,
+            textos.msg_casal_compartilhou(actor, 1, updated.title),
+            reply_markup=keyboards.kb_notif_ver_tarefa(task_id),
         )
     await _refresh_detail(query, task_id, context)
+
+
+async def cb_task_remove_ask(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Pede confirmação para remover (descartar) uma tarefa — distinto de concluir."""
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+    task_id = uuid.UUID(query.data.split(":")[1])
+    task = await asyncio.to_thread(task_service.get_task_with_list, task_id)
+    titulo = task.title if task else "essa tarefa"
+    await query.edit_message_text(
+        textos.msg_confirmar_remover(titulo),
+        parse_mode="Markdown",
+        reply_markup=keyboards.kb_confirmar_remover(task_id),
+    )
+
+
+async def cb_task_remove(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Remove (descarta) a tarefa: status 'arquivada', sem marcar como concluída.
+
+    Para tarefa de casal, avisa o par com mensagem neutra (não de conclusão).
+    """
+    query = update.callback_query
+    await query.answer()
+    if not is_authorized(update):
+        return
+    task_id = uuid.UUID(query.data.split(":")[1])
+    chat_id = update.effective_chat.id
+    try:
+        task = await asyncio.to_thread(task_service.get_task_with_list, task_id)
+        ok = await asyncio.to_thread(task_service.archive_task, task_id)
+        if not ok or task is None:
+            await query.edit_message_text(textos.MSG_ERRO_GENERICO)
+            return
+        if getattr(task, "couple_id", None) is not None:
+            actor = (update.effective_user.full_name if update.effective_user else None) or "Seu par"
+            await notify.notify_partner(
+                chat_id, context.bot, textos.msg_casal_removeu(actor, task.title)
+            )
+        lists = await asyncio.to_thread(task_service.get_user_lists, chat_id)
+        inbox_count = await asyncio.to_thread(task_service.get_inbox_count, chat_id)
+        couple_count = await asyncio.to_thread(task_service.get_couple_task_count, chat_id)
+        await query.edit_message_text(
+            f"{textos.msg_tarefa_removida(task.title)}\n\n{textos.MSG_SUAS_LISTAS}",
+            reply_markup=keyboards.kb_listas(lists, inbox_count, couple_count),
+        )
+    except Exception:
+        logger.exception("Erro ao remover tarefa %s", task_id)
+        await query.edit_message_text(textos.MSG_ERRO_GENERICO)
 
 
 async def cb_task_assign(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

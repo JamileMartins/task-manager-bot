@@ -963,10 +963,28 @@ def msg_casal_concluiu(actor: str, titulo: str) -> str:
     )
 
 
-def msg_casal_compartilhou(actor: str, n: int) -> str:
+def msg_casal_compartilhou(actor: str, n: int, titulo: str | None = None) -> str:
     if n == 1:
+        if titulo:
+            return f'💞 {actor} compartilhou "{titulo}" com você.'
         return f"💞 {actor} compartilhou uma tarefa de casal com você."
     return f"💞 {actor} compartilhou {n} tarefas de casal com você."
+
+
+def msg_casal_removeu(actor: str, titulo: str) -> str:
+    """Aviso ao par quando uma tarefa de casal é retirada (não concluída)."""
+    return f'🗑️ {actor} tirou "{titulo}" da lista de vocês (não foi concluída).'
+
+
+def msg_confirmar_remover(titulo: str) -> str:
+    return (
+        f'Remover "{titulo}"? 🗑️\n\n'
+        "Ela sai das suas listas *sem* ser marcada como concluída."
+    )
+
+
+def msg_tarefa_removida(titulo: str) -> str:
+    return f'🗑️ Removida "{titulo}". Não contou como concluída.'
 
 
 def msg_casal_atribuiu(actor: str, titulo: str) -> str:

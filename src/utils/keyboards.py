@@ -330,12 +330,36 @@ def kb_task_detail(task: Task, listas: list[dict], subtasks=None, show_couple: b
         elif show_couple:
             rows.append([InlineKeyboardButton("💞 Tornar do casal", callback_data=f"task_couple:{task.id}:1")])
 
+    rows.append([InlineKeyboardButton("🗑️ Remover", callback_data=f"task_rm_ask:{task.id}")])
+
     if task.list_id:
         rows.append([InlineKeyboardButton("← Voltar", callback_data=f"view_list:{task.list_id}")])
     else:
         rows.append([InlineKeyboardButton("← Voltar", callback_data="view_inbox")])
 
     return InlineKeyboardMarkup(rows)
+
+
+def kb_confirmar_remover(task_id) -> InlineKeyboardMarkup:
+    """Confirmação de remoção de uma tarefa (descarte, não conclusão)."""
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("🗑️ Sim, remover", callback_data=f"task_rm:{task_id}"),
+        InlineKeyboardButton("✖️ Cancelar", callback_data=f"task_dt:{task_id}"),
+    ]])
+
+
+def kb_notif_ver_tarefa(task_id) -> InlineKeyboardMarkup:
+    """Botão anexado à notificação ao par: abre o detalhe da tarefa (onde dá pra editar/remover)."""
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("🔍 Ver tarefa", callback_data=f"task_dt:{task_id}")
+    ]])
+
+
+def kb_notif_ver_casal() -> InlineKeyboardMarkup:
+    """Botão para a notificação de várias tarefas compartilhadas de uma vez."""
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("💞 Ver tarefas do casal", callback_data="view_casal")
+    ]])
 
 
 def kb_nota(task_id: str, has_notes: bool) -> InlineKeyboardMarkup:

@@ -482,6 +482,39 @@ def test_periodo_label_semanal_tem_intervalo():
     assert "–" in label
 
 
+def test_msg_casal_compartilhou_com_titulo():
+    m = textos.msg_casal_compartilhou("Jamile Martins", 1, "Comprar tinta")
+    assert "Comprar tinta" in m
+
+
+def test_msg_casal_compartilhou_sem_titulo_mantem_generico():
+    m = textos.msg_casal_compartilhou("Jamile", 1)
+    assert m == "💞 Jamile compartilhou uma tarefa de casal com você."
+
+
+def test_msg_casal_compartilhou_plural():
+    m = textos.msg_casal_compartilhou("Jamile", 3)
+    assert "3 tarefas" in m
+
+
+def test_msg_casal_removeu_e_neutro_e_identifica_tarefa():
+    m = textos.msg_casal_removeu("Jamile", "Trocar prateleira")
+    assert "Trocar prateleira" in m
+    assert "tirou" in m  # linguagem de remoção, não de conclusão
+    assert "não foi concluída" in m  # deixa claro que NÃO foi feita
+
+
+def test_msg_tarefa_removida_identifica_e_nao_conta_como_concluida():
+    m = textos.msg_tarefa_removida("Comprar tinta")
+    assert "Comprar tinta" in m
+    assert "não contou" in m.lower()
+
+
+def test_msg_confirmar_remover_tem_titulo():
+    m = textos.msg_confirmar_remover("Pagar luz")
+    assert "Pagar luz" in m
+
+
 def test_msg_busca_contem_titulo_e_termo():
     t = _mock_task(title="Reunião mensal")
     resultado = textos.msg_busca([t], "reunião")

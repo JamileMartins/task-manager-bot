@@ -46,8 +46,16 @@ def _bots_to_try(partner_chat_id: int, fallback_bot: Bot | None) -> list[Bot]:
     return order
 
 
-async def notify_partner(actor_chat_id: int, fallback_bot: Bot | None, text: str) -> bool:
-    """Envia `text` ao parceiro do casal de `actor_chat_id`. Retorna True se entregou."""
+async def notify_partner(
+    actor_chat_id: int,
+    fallback_bot: Bot | None,
+    text: str,
+    reply_markup=None,
+) -> bool:
+    """Envia `text` ao parceiro do casal de `actor_chat_id`. Retorna True se entregou.
+
+    `reply_markup` opcional anexa um teclado inline (ex.: botão "Ver tarefa").
+    """
     partner_id = await asyncio.to_thread(couple_service.partner_chat_id, actor_chat_id)
     if partner_id is None:
         return False
@@ -56,7 +64,7 @@ async def notify_partner(actor_chat_id: int, fallback_bot: Bot | None, text: str
         return False
     for bot in _bots_to_try(partner_id, fallback_bot):
         try:
-            await bot.send_message(partner_id, text)
+            await bot.send_message(partner_id, text, reply_markup=reply_markup)
             return True
         except TelegramError:
             continue
