@@ -135,6 +135,8 @@ from src.handlers.task_detail import (
     cb_sub_complete,
     cb_task_assign,
     cb_task_detail,
+    cb_task_remove,
+    cb_task_remove_ask,
     cb_task_set_category,
     cb_task_set_couple,
     cb_task_move_force,
@@ -313,6 +315,8 @@ def _register_handlers(app: Application) -> None:
     app.add_handler(CallbackQueryHandler(cb_task_set_category, pattern=r"^task_cat:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_couple, pattern=r"^task_couple:"))
     app.add_handler(CallbackQueryHandler(cb_task_assign, pattern=r"^task_assign:"))
+    app.add_handler(CallbackQueryHandler(cb_task_remove_ask, pattern=r"^task_rm_ask:"))
+    app.add_handler(CallbackQueryHandler(cb_task_remove, pattern=r"^task_rm:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_quadrant, pattern=r"^task_q:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_energy, pattern=r"^task_e:"))
     app.add_handler(CallbackQueryHandler(cb_task_set_estimate, pattern=r"^task_m:"))

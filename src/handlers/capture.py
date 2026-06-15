@@ -50,13 +50,18 @@ def _clear_pending(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def _notify_couple_created(update: Update, context: ContextTypes.DEFAULT_TYPE, saved: list) -> None:
     """Avisa o parceiro quando tarefas de casal foram criadas na captura."""
-    n = sum(1 for t in saved if getattr(t, "couple_id", None) is not None)
+    couple_tasks = [t for t in saved if getattr(t, "couple_id", None) is not None]
+    n = len(couple_tasks)
     if n == 0:
         return
     actor = (update.effective_user.full_name if update.effective_user else None) or "Seu par"
-    await notify.notify_partner(
-        update.effective_chat.id, context.bot, textos.msg_casal_compartilhou(actor, n)
-    )
+    if n == 1:
+        texto = textos.msg_casal_compartilhou(actor, 1, couple_tasks[0].title)
+        markup = keyboards.kb_notif_ver_tarefa(couple_tasks[0].id)
+    else:
+        texto = textos.msg_casal_compartilhou(actor, n)
+        markup = keyboards.kb_notif_ver_casal()
+    await notify.notify_partner(update.effective_chat.id, context.bot, texto, reply_markup=markup)
 
 
 # ---------------------------------------------------------------------------

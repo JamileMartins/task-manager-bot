@@ -7,6 +7,17 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não lançado]
 
+## [1.22.2] — 2026-06-15 — Notificação de casal mais clara + remover tarefa
+
+### Adicionado
+
+- **Notificação de compartilhamento identifica a tarefa**: ao tornar uma tarefa do casal, o par recebe o título (`💞 Fulana compartilhou "X" com você.`) e um botão **🔍 Ver tarefa** que abre o detalhe (onde dá pra editar/remover). No brain dump com várias tarefas, botão **💞 Ver tarefas do casal**.
+- **Ação 🗑️ Remover** no detalhe de qualquer tarefa: descarta a tarefa (status `arquivada`) **sem** marcá-la como concluída, com passo de confirmação. Para tarefas de casal, o par é avisado com mensagem neutra (`🗑️ Fulana tirou "X" da lista de vocês (não foi concluída)`), evitando a impressão de que a tarefa foi feita.
+
+### Corrigido
+
+- Antes, a única forma de tirar uma tarefa da lista era concluí-la, o que mandava ao par uma notificação de "concluiu" enganosa.
+
 ## [1.22.1] — 2026-06-13 — Editar janela de tempo + ajuda
 
 ### Adicionado
