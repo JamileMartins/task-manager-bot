@@ -49,7 +49,7 @@ def kb_gerenciar_lista(list_id: uuid.UUID) -> InlineKeyboardMarkup:
             InlineKeyboardButton("📦 Arquivar", callback_data=f"archive_list:{list_id}"),
         ],
         [InlineKeyboardButton("🗓️ Janela de tempo", callback_data=f"list_window_cfg:{list_id}")],
-        [InlineKeyboardButton("✖️ Cancelar", callback_data="cancel_mgmt")],
+        [InlineKeyboardButton("✖️ Cancelar", callback_data=f"view_list:{list_id}")],
     ])
 
 
@@ -64,7 +64,7 @@ def kb_list_window_edit(list_id: uuid.UUID, current: str | None) -> InlineKeyboa
             InlineKeyboardButton("🗓️ Semanal" + _mark("semana"), callback_data=f"set_window:{list_id}:semana"),
             InlineKeyboardButton("📆 Mensal" + _mark("mes"), callback_data=f"set_window:{list_id}:mes"),
         ],
-        [InlineKeyboardButton("✖️ Cancelar", callback_data="cancel_mgmt")],
+        [InlineKeyboardButton("✖️ Cancelar", callback_data=f"view_list:{list_id}")],
     ])
 
 
@@ -72,7 +72,7 @@ def kb_confirmar_arquivar(list_id: uuid.UUID) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📦 Confirmar", callback_data=f"do_archive:{list_id}"),
-            InlineKeyboardButton("✖️ Cancelar", callback_data="cancel_mgmt"),
+            InlineKeyboardButton("✖️ Cancelar", callback_data=f"view_list:{list_id}"),
         ]
     ])
 
