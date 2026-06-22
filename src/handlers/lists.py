@@ -78,14 +78,6 @@ async def cb_manage_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await query.edit_message_reply_markup(reply_markup=keyboards.kb_gerenciar_lista(list_id))
 
 
-async def cb_cancel_mgmt(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    await query.answer()
-    if not is_authorized(update):
-        return
-    await _show_lists(query, update.effective_chat.id)
-
-
 # ---------------------------------------------------------------------------
 # Editar janela de tempo de uma lista existente
 # ---------------------------------------------------------------------------

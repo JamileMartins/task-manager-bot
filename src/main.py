@@ -115,7 +115,6 @@ from src.handlers.foco import (
 )
 from src.handlers.lists import (
     cb_archive_list,
-    cb_cancel_mgmt,
     cb_do_archive,
     cb_list_window_menu,
     cb_manage_list,
@@ -352,7 +351,6 @@ def _register_handlers(app: Application) -> None:
     app.add_handler(CallbackQueryHandler(cb_do_archive, pattern=r"^do_archive:"))
     app.add_handler(CallbackQueryHandler(cb_list_window_menu, pattern=r"^list_window_cfg:"))
     app.add_handler(CallbackQueryHandler(cb_set_list_window, pattern=r"^set_window:"))
-    app.add_handler(CallbackQueryHandler(cb_cancel_mgmt, pattern=r"^cancel_mgmt$"))
 
     # Voz e áudio — antes do catch-all de texto
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
