@@ -390,6 +390,16 @@ async def _run_multiple(apps: list[Application]) -> None:
 def main() -> None:
     logger.info("Iniciando Task Manager...")
     run_migrations()
+    # run_migrations() executa o env.py do Alembic, cujo fileConfig(alembic.ini) reconfigura o
+    # logger raiz com o nível de [logger_root] (WARN), silenciando os logs do app daqui em diante.
+    # Reaplicamos nossa configuração (force=True) para restaurar o nível INFO.
+    logging.basicConfig(
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        level=logging.INFO,
+        force=True,
+    )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("telegram").setLevel(logging.WARNING)
 
     # App principal: menu + jobs. Apps extras (um por parceiro) só recebem updates;
     # jobs ficam só no principal para não duplicar resumos/lembretes.

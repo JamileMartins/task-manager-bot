@@ -7,6 +7,20 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não lançado]
 
+### Infra
+
+- **Migração do Railway/Supabase para a VM Oracle (Docker)**: `Dockerfile` + `docker-compose.yml`
+  (bot + Postgres em contêiner, sem porta exposta) e `.github/workflows/deploy.yml` (testes +
+  deploy automático via SSH). Dados migrados do Supabase por `pg_dump`/restore. Removido
+  `railway.json`. Backup diário incluído no agendamento da VM.
+
+### Corrigido
+
+- Logs do bot ficavam mudos após o boot: o `fileConfig()` do Alembic (chamado por
+  `run_migrations()`) reconfigurava o logger raiz com `[logger_root] level = WARN`. Corrigido com
+  `disable_existing_loggers=False` no `env.py` e `logging.basicConfig(..., force=True)` após as
+  migrações no `main.py`.
+
 ## [1.22.2] — 2026-06-15 — Notificação de casal mais clara + remover tarefa
 
 ### Adicionado

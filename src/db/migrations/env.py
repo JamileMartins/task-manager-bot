@@ -21,7 +21,9 @@ if db_url:
     config.set_main_option("sqlalchemy.url", db_url)
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers=False: sem isso, o fileConfig() desativa os loggers já criados do
+    # app quando run_migrations() roda em processo (não como CLI separado), deixando o bot "mudo".
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 
