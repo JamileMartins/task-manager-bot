@@ -1,0 +1,48 @@
+name: Deploy na VM
+
+# Dispara a cada push na main e também pode ser executado manualmente
+# (aba Actions → Deploy na VM → Run workflow).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vm-taskmanager
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+      - name: Rodar testes
+        run: pytest -q
+
+  deploy:
+    name: Deploy
+    needs: test          # só faz deploy se os testes passarem
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: 22
+          script_stop: true
+          script: |
+            cd /opt/task-manager-bot
+            git pull --ff-only
+            sudo docker compose up -d --build
+            sleep 5
+            sudo docker compose ps
+            sudo docker compose ps --format '{{.Service}} {{.State}}' | grep -q '^bot running$'
